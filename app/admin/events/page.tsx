@@ -11,8 +11,9 @@ export default async function EventsPage() {
     include: { _count: { select: { drops: true } } },
   });
 
-  const totalDrops  = events.reduce((s: number, e) => s + e._count.drops, 0);
-  const activeCount = events.filter(e => e.isActive).length;
+  type EventWithCount = Event & { _count: { drops: number } };
+  const totalDrops  = events.reduce((s: number, e: EventWithCount) => s + e._count.drops, 0);
+  const activeCount = events.filter((e: EventWithCount) => e.isActive).length;
 
   return (
     <div>
