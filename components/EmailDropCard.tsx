@@ -12,6 +12,26 @@ type Props = {
   logoUrl?:     string;
 };
 
+// Compress a photo to max 500px / JPEG 0.72 before sending to API
+// Reduces each photo from ~180KB to ~55KB → 20 photos stay well under Vercel's 4.5MB limit
+function compressForEmail(dataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX   = 500;
+      const scale = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+      const w     = Math.round(img.naturalWidth  * scale);
+      const h     = Math.round(img.naturalHeight * scale);
+      const c     = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d')!.drawImage(img, 0, 0, w, h);
+      resolve(c.toDataURL('image/jpeg', 0.72));
+    };
+    img.onerror = () => resolve(dataUrl); // fallback: send original
+    img.src = dataUrl;
+  });
+}
+
 type State = 'idle' | 'sending' | 'sent' | 'error';
 
 export default function EmailDropCard({ photos, onSent, slug, accentColor = '#1E8BFF', eventName, logoUrl }: Props) {
@@ -26,10 +46,13 @@ export default function EmailDropCard({ photos, onSent, slug, accentColor = '#1E
     setState('sending');
     setErrorMsg('');
     try {
+      // Compress before sending to stay well under Vercel's 4.5 MB request limit
+      const compressed = await Promise.all(photos.map(compressForEmail));
+
       const res  = await fetch('/api/send-drop', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, photos, slug }),
+        body: JSON.stringify({ email, photos: compressed, slug }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Onbekende fout');

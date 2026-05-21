@@ -115,6 +115,8 @@ export default function CameraCapture({
   const [countdown,    setCountdown]    = useState<number | null>(null);
   const [permission,   setPermission]   = useState<'idle' | 'requesting' | 'granted' | 'denied'>('idle');
   const [deniedReason, setDeniedReason] = useState<'blocked' | 'unavailable'>('blocked');
+  const [facingMode,   setFacingMode]   = useState<'environment' | 'user'>('environment');
+  const [switching,    setSwitching]    = useState(false);
 
   const remaining  = maxPhotos - count;
   const isComplete = count >= maxPhotos;
@@ -124,17 +126,18 @@ export default function CameraCapture({
   const cardBg = `rgba(${Math.round(7 + ar * 0.04)}, ${Math.round(22 + ag * 0.04)}, ${Math.round(47 + ab * 0.04)}, 0.92)`;
 
   // ── Start camera ────────────────────────────────────────────────
-  const startCamera = useCallback(async () => {
+  const startCamera = useCallback(async (mode: 'environment' | 'user' = 'environment') => {
     setPermission('requesting');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 960 } },
+        video: { facingMode: { ideal: mode }, width: { ideal: 1280 }, height: { ideal: 960 } },
         audio: false,
       });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         setPermission('granted');
+        setFacingMode(mode);
       }
     } catch (err: unknown) {
       const name = (err instanceof Error) ? err.name : '';
@@ -142,6 +145,31 @@ export default function CameraCapture({
       setPermission('denied');
     }
   }, []);
+
+  // ── Switch front / back camera ───────────────────────────────────
+  const switchCamera = useCallback(async () => {
+    if (permission !== 'granted' || switching || flashing) return;
+    setSwitching(true);
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
+    const newMode = facingMode === 'environment' ? 'user' : 'environment';
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: newMode }, width: { ideal: 1280 }, height: { ideal: 960 } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        setFacingMode(newMode);
+      }
+    } catch {
+      // device might only have one camera — restart with original mode
+      await startCamera(facingMode);
+    } finally {
+      setSwitching(false);
+    }
+  }, [permission, switching, flashing, facingMode, startCamera]);
 
   useEffect(() => () => { streamRef.current?.getTracks().forEach(t => t.stop()); }, []);
 
@@ -392,6 +420,30 @@ export default function CameraCapture({
                 style={{ borderColor: `${accentColor}90` }} />
               <div className="absolute bottom-3 right-3 w-7 h-7 border-b-2 border-r-2 rounded-br"
                 style={{ borderColor: `${accentColor}90` }} />
+
+              {/* Camera flip button */}
+              <button
+                onClick={switchCamera}
+                disabled={switching}
+                aria-label="Wissel camera"
+                className="absolute bottom-4 right-4 w-9 h-9 rounded-full flex items-center justify-center z-10 transition-all active:scale-90 disabled:opacity-40"
+                style={{
+                  background: 'rgba(7,22,47,0.55)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  backdropFilter: 'blur(8px)',
+                }}
+              >
+                <svg
+                  width="17" height="17" viewBox="0 0 17 17" fill="none"
+                  className={switching ? 'animate-spin' : ''}
+                  style={{ transformOrigin: 'center' }}
+                >
+                  <path d="M2.5 6A6 6 0 018.5 2.5c2 0 3.8.98 4.9 2.5M14.5 11A6 6 0 018.5 14.5c-2 0-3.8-.98-4.9-2.5"
+                    stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                  <path d="M12.5 2l2.5 3-3 .5M4.5 15l-2.5-3 3-.5"
+                    stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
             </>
           )}
 

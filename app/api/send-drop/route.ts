@@ -13,6 +13,16 @@ const GLOBAL_TEST_EMAILS = (process.env.TEST_EMAILS ?? '')
   .filter(Boolean);
 
 export async function POST(req: NextRequest) {
+  // ── Origin check — block requests from outside the app ──────────
+  const origin  = req.headers.get('origin')  ?? '';
+  const referer = req.headers.get('referer') ?? '';
+  const base    = (process.env.NEXT_PUBLIC_BASE_URL ?? 'https://festidrop.vercel.app').replace(/\/$/, '');
+  const allowed = [base, 'http://localhost:3000', 'http://localhost:3001'];
+  const isAllowed = allowed.some(o => origin.startsWith(o) || referer.startsWith(o));
+  if (!isAllowed) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const { email, photos, slug } = (await req.json()) as {
     email: string;
     photos: string[];
@@ -21,6 +31,12 @@ export async function POST(req: NextRequest) {
 
   if (!email || !Array.isArray(photos) || photos.length === 0) {
     return NextResponse.json({ error: "email en foto's zijn verplicht" }, { status: 400 });
+  }
+
+  // Basic sanity: reject suspiciously large payloads early
+  const totalChars = photos.reduce((s: number, p: string) => s + p.length, 0);
+  if (totalChars > 20_000_000) {
+    return NextResponse.json({ error: "Payload te groot. Probeer opnieuw." }, { status: 413 });
   }
 
   const normalizedEmail = email.trim().toLowerCase();
