@@ -126,24 +126,6 @@ export default function CameraCapture({ onComplete }: Props) {
 
   useEffect(() => () => { streamRef.current?.getTracks().forEach(t => t.stop()); }, []);
 
-  // ── Countdown → fires shoot when it hits 0 ───────────────────────
-  useEffect(() => {
-    if (countdown === null) return;
-    if (countdown === 0) {
-      setCountdown(null);
-      shoot();
-      return;
-    }
-    const t = setTimeout(() => setCountdown(c => c !== null ? c - 1 : null), 1000);
-    return () => clearTimeout(t);
-  }, [countdown, shoot]);
-
-  // ── Start countdown on button press ─────────────────────────────
-  const handleShutterPress = useCallback(() => {
-    if (isComplete || flashing || permission !== 'granted' || countdown !== null) return;
-    setCountdown(3);
-  }, [isComplete, flashing, permission, countdown]);
-
   // ── Capture one photo ────────────────────────────────────────────
   const shoot = useCallback(() => {
     if (isComplete || flashing || permission !== 'granted') return;
@@ -201,6 +183,24 @@ export default function CameraCapture({ onComplete }: Props) {
       }
     }, 160);
   }, [isComplete, flashing, permission]);
+
+  // ── Countdown → fires shoot when it hits 0 ───────────────────────
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown === 0) {
+      setCountdown(null);
+      shoot();
+      return;
+    }
+    const t = setTimeout(() => setCountdown(c => c !== null ? c - 1 : null), 1000);
+    return () => clearTimeout(t);
+  }, [countdown, shoot]);
+
+  // ── Start countdown on button press ─────────────────────────────
+  const handleShutterPress = useCallback(() => {
+    if (isComplete || flashing || permission !== 'granted' || countdown !== null) return;
+    setCountdown(3);
+  }, [isComplete, flashing, permission, countdown]);
 
   // ── Status line ──────────────────────────────────────────────────
   const statusText =
