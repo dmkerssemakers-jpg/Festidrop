@@ -90,9 +90,10 @@ type Props = {
   eventId?: string;
   logoUrl?: string | null;
   eventName?: string;
+  topOffset?: string;
 };
 
-export default function CameraCapture({ onComplete, maxPhotos = MAX, logoUrl, eventName }: Props) {
+export default function CameraCapture({ onComplete, maxPhotos = MAX, logoUrl, eventName, topOffset = 'pt-24' }: Props) {
   const videoRef      = useRef<HTMLVideoElement>(null);
   const canvasRef     = useRef<HTMLCanvasElement>(null);
   const streamRef     = useRef<MediaStream | null>(null);
@@ -239,7 +240,7 @@ export default function CameraCapture({ onComplete, maxPhotos = MAX, logoUrl, ev
 
   // ── Render ───────────────────────────────────────────────────────
   return (
-    <section id="camera" className="px-5 pb-16 max-w-md mx-auto">
+    <section id="camera" className={`px-5 pb-16 max-w-md mx-auto ${topOffset}`}>
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}

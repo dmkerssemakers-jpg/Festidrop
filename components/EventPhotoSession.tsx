@@ -9,9 +9,10 @@ interface Props {
   maxPhotos: number;
   slug: string;
   logoUrl?: string | null;
+  hasSubHeader?: boolean;
 }
 
-export default function EventPhotoSession({ eventId, eventName, slug, maxPhotos, logoUrl }: Props) {
+export default function EventPhotoSession({ eventId, eventName, slug, maxPhotos, logoUrl, hasSubHeader }: Props) {
   const router = useRouter();
   const storageKey = `festidrop_photos_${slug}`;
 
@@ -29,6 +30,7 @@ export default function EventPhotoSession({ eventId, eventName, slug, maxPhotos,
       eventId={eventId}
       logoUrl={logoUrl}
       eventName={eventName}
+      topOffset={hasSubHeader ? 'pt-36' : 'pt-24'}
     />
   );
 }

@@ -270,26 +270,40 @@ export default function NewEventForm() {
             </div>
           </div>
 
-          {/* Header */}
+          {/* FestiDrop main header */}
           <div
-            className="px-4 py-3 border-b flex items-center justify-center gap-2"
+            className="px-4 py-2.5 flex items-center justify-center gap-1.5"
+            style={{ background: '#07162F' }}
+          >
+            <div className="w-4 h-4 rounded-md flex items-center justify-center text-white text-[7px] font-black"
+              style={{ background: 'linear-gradient(135deg,#1E8BFF,#20D6E8)' }}>
+              FD
+            </div>
+            <span className="text-[10px] font-black" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
+              Festi<span style={{ background: 'linear-gradient(90deg,#1E8BFF,#20D6E8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Drop</span>
+            </span>
+          </div>
+
+          {/* Event sub-header */}
+          <div
+            className="px-4 py-1.5 flex items-center justify-center gap-1.5 border-b"
             style={{
-              background: 'rgba(247,251,255,0.92)',
+              background: `linear-gradient(135deg, ${color}18, ${color}08)`,
               borderColor: `${color}30`,
             }}
           >
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt="" className="h-5 object-contain" />
+              <img src={logoUrl} alt="" className="h-3.5 object-contain" />
             ) : (
               <>
                 <div
-                  className="w-5 h-5 rounded-md flex items-center justify-center text-white text-[8px] font-black"
-                  style={{ background: color }}
+                  className="w-3 h-3 rounded flex items-center justify-center text-white"
+                  style={{ background: color, fontSize: '5px', fontWeight: 900 }}
                 >
-                  FD
+                  ✦
                 </div>
-                <span className="text-[11px] font-black text-navy" style={{ letterSpacing: '-0.02em' }}>
+                <span className="text-[9px] font-bold text-navy" style={{ letterSpacing: '-0.01em' }}>
                   {name || 'Jouw event'}
                 </span>
               </>
