@@ -77,17 +77,30 @@ export async function POST(req: NextRequest) {
 </body>
 </html>`;
 
+  // Guard: API key must be present
+  if (!process.env.RESEND_API_KEY) {
+    console.error('[send-drop] RESEND_API_KEY is not set');
+    return NextResponse.json({ error: 'Server configuratiefout (geen API key).' }, { status: 500 });
+  }
+
   try {
-    await resend.emails.send({
+    const { data, error } = await resend.emails.send({
       from: FROM,
       to: email,
       subject: `📸 Jouw FestiDrop — ${photos.length} polaroids wachten op je`,
       html,
       attachments,
     });
+
+    if (error) {
+      console.error('[send-drop] Resend returned error:', error);
+      return NextResponse.json({ error: `Resend: ${error.message}` }, { status: 500 });
+    }
+
+    console.log('[send-drop] Sent OK, id:', data?.id);
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error('[send-drop] Resend error:', err);
+    console.error('[send-drop] Unexpected error:', err);
     return NextResponse.json({ error: 'Verzenden mislukt. Probeer het opnieuw.' }, { status: 500 });
   }
 }
