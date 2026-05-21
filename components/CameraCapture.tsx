@@ -94,9 +94,10 @@ export default function CameraCapture({ onComplete }: Props) {
   const onCompleteRef = useRef(onComplete);
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
 
-  const [count,      setCount]      = useState(0);
-  const [flashing,   setFlashing]   = useState(false);
-  const [permission, setPermission] = useState<'idle' | 'requesting' | 'granted' | 'denied'>('idle');
+  const [count,        setCount]        = useState(0);
+  const [flashing,     setFlashing]     = useState(false);
+  const [countdown,    setCountdown]    = useState<number | null>(null);
+  const [permission,   setPermission]   = useState<'idle' | 'requesting' | 'granted' | 'denied'>('idle');
   const [deniedReason, setDeniedReason] = useState<'blocked' | 'unavailable'>('blocked');
 
   const remaining  = MAX - count;
@@ -124,6 +125,24 @@ export default function CameraCapture({ onComplete }: Props) {
   }, []);
 
   useEffect(() => () => { streamRef.current?.getTracks().forEach(t => t.stop()); }, []);
+
+  // ── Countdown → fires shoot when it hits 0 ───────────────────────
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown === 0) {
+      setCountdown(null);
+      shoot();
+      return;
+    }
+    const t = setTimeout(() => setCountdown(c => c !== null ? c - 1 : null), 1000);
+    return () => clearTimeout(t);
+  }, [countdown, shoot]);
+
+  // ── Start countdown on button press ─────────────────────────────
+  const handleShutterPress = useCallback(() => {
+    if (isComplete || flashing || permission !== 'granted' || countdown !== null) return;
+    setCountdown(3);
+  }, [isComplete, flashing, permission, countdown]);
 
   // ── Capture one photo ────────────────────────────────────────────
   const shoot = useCallback(() => {
@@ -299,12 +318,37 @@ export default function CameraCapture({ onComplete }: Props) {
             </>
           )}
 
+          {/* Countdown overlay */}
+          <AnimatePresence>
+            {countdown !== null && countdown > 0 && (
+              <motion.div
+                className="absolute inset-0 flex items-center justify-center z-10"
+                style={{ background: 'rgba(7,22,47,0.55)' }}
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              >
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={countdown}
+                    className="font-black text-white select-none"
+                    style={{ fontSize: '108px', lineHeight: 1, textShadow: '0 0 60px rgba(30,139,255,0.7), 0 4px 32px rgba(0,0,0,0.6)' }}
+                    initial={{ scale: 1.7, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.3, opacity: 0 }}
+                    transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    {countdown}
+                  </motion.span>
+                </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Complete overlay */}
           {isComplete && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2"
                  style={{ background: 'rgba(7,22,47,0.72)' }}>
               <p className="text-white font-black text-xl">Klaar! 🎉</p>
-              <p className="text-white/60 text-sm">Scroll omlaag voor je drop.</p>
+              <p className="text-white/60 text-sm">Je drop wordt klaargemaakt…</p>
             </div>
           )}
         </div>
@@ -319,9 +363,9 @@ export default function CameraCapture({ onComplete }: Props) {
           </div>
 
           <motion.button
-            onClick={shoot}
-            whileTap={(isComplete || permission !== 'granted') ? {} : { scale: 0.87 }}
-            disabled={isComplete || permission !== 'granted'}
+            onClick={handleShutterPress}
+            whileTap={(isComplete || permission !== 'granted' || countdown !== null) ? {} : { scale: 0.87 }}
+            disabled={isComplete || permission !== 'granted' || countdown !== null}
             aria-label="Maak foto"
             className="w-[76px] h-[76px] rounded-full flex items-center justify-center focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
             style={{

@@ -1,13 +1,15 @@
 'use client';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FestiDropIcon } from './Logo';
 
-type Props = { photos: string[] };
+type Props = { photos: string[]; onSent?: () => void };
 
 type State = 'idle' | 'sending' | 'sent' | 'error';
 
-export default function EmailDropCard({ photos }: Props) {
+export default function EmailDropCard({ photos, onSent }: Props) {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [state, setState] = useState<State>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -27,6 +29,7 @@ export default function EmailDropCard({ photos }: Props) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Onbekende fout');
       setState('sent');
+      onSent?.();
     } catch (err: unknown) {
       setState('error');
       setErrorMsg(err instanceof Error ? err.message : 'Probeer het opnieuw.');
@@ -114,6 +117,12 @@ export default function EmailDropCard({ photos }: Props) {
               <p className="text-[12px] text-muted mt-3">
                 Check je inbox — de foto's wachten op je. 📸
               </p>
+              <button
+                onClick={() => router.push('/')}
+                className="mt-5 text-xs font-bold text-azure hover:underline"
+              >
+                ← Nieuwe drop maken
+              </button>
             </motion.div>
           )}
         </AnimatePresence>

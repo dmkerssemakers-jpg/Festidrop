@@ -1,29 +1,18 @@
 'use client';
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import CameraCapture from './CameraCapture';
-import EmailDropCard from './EmailDropCard';
 
 export default function PhotoSessionManager() {
-  const [photos, setPhotos] = useState<string[]>([]);
-  const isComplete = photos.length >= 10;
+  const router = useRouter();
 
-  return (
-    <>
-      <CameraCapture onComplete={setPhotos} />
+  function handleComplete(photos: string[]) {
+    try {
+      localStorage.setItem('festidrop_photos', JSON.stringify(photos));
+    } catch {
+      // localStorage vol — onwaarschijnlijk maar veilig afvangen
+    }
+    router.push('/send');
+  }
 
-      <AnimatePresence>
-        {isComplete && (
-          <motion.div
-            key="email-card"
-            initial={{ opacity: 0, y: 28 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <EmailDropCard photos={photos} />
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
-  );
+  return <CameraCapture onComplete={handleComplete} />;
 }
