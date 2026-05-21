@@ -14,11 +14,119 @@ interface Props {
   initialDesign: PolaroidDesign;
 }
 
-// ── Canvas display dimensions ─────────────────────────────────────────────────
-const CANVAS_W = 600;
-const CANVAS_H = 750;
-const DISPLAY_W = 396; // display px — retina-sharp at 2× effective
+// ── Canvas dimensions ─────────────────────────────────────────────────────────
+const CANVAS_W  = 600;
+const CANVAS_H  = 750;
+const DISPLAY_W = 396;
 
+// ── Design themes ─────────────────────────────────────────────────────────────
+interface Theme {
+  id:   string;
+  name: string;
+  /** Partial design — labelTagline is always preserved from current state */
+  design: Omit<PolaroidDesign, 'labelTagline'>;
+  /** Visual preview colours for the CSS thumbnail */
+  preview: { frame: string; photoA: string; photoB: string; label: string; accent: string };
+}
+
+const THEMES: Theme[] = [
+  {
+    id: 'kodak',
+    name: 'Kodak',
+    design: {
+      frameColor: '#FEFDF8', labelBg: '#FEFDF8', labelTextColor: '#2C1810',
+      labelStyle: 'solid', noteFont: 'caveat',
+      dateStamp: true, dateStampColor: '#E8192C', dateStampPosition: 'left',
+      watermark: true, watermarkOpacity: 20, watermarkColor: '#FFFFFF',
+      filterStrength: 85, logoPosition: 'center',
+    },
+    preview: { frame: '#FEFDF8', photoA: '#D4654A', photoB: '#8B3A62', label: '#FEFDF8', accent: '#E8192C' },
+  },
+  {
+    id: 'dark',
+    name: 'Dark',
+    design: {
+      frameColor: '#111111', labelBg: '#1A1A2E', labelTextColor: '#EEEEEE',
+      labelStyle: 'accent-line', noteFont: 'uppercase',
+      dateStamp: true, dateStampColor: '#FF3A5C', dateStampPosition: 'right',
+      watermark: true, watermarkOpacity: 15, watermarkColor: '#FFFFFF',
+      filterStrength: 50, logoPosition: 'center',
+    },
+    preview: { frame: '#111111', photoA: '#1A0030', photoB: '#300060', label: '#1A1A2E', accent: '#FF3A5C' },
+  },
+  {
+    id: 'minimal',
+    name: 'Minimal',
+    design: {
+      frameColor: '#FFFFFF', labelBg: '#FFFFFF', labelTextColor: '#07162F',
+      labelStyle: 'solid', noteFont: 'uppercase',
+      dateStamp: false, dateStampColor: '#07162F', dateStampPosition: 'left',
+      watermark: false, watermarkOpacity: 10, watermarkColor: '#000000',
+      filterStrength: 0, logoPosition: 'center',
+    },
+    preview: { frame: '#FFFFFF', photoA: '#7EB5E5', photoB: '#2C5F8A', label: '#FFFFFF', accent: '#07162F' },
+  },
+  {
+    id: 'film',
+    name: 'Warm Film',
+    design: {
+      frameColor: '#F5F0E8', labelBg: '#F5F0E8', labelTextColor: '#3D2B1F',
+      labelStyle: 'grain', noteFont: 'caveat',
+      dateStamp: true, dateStampColor: '#C07030', dateStampPosition: 'left',
+      watermark: false, watermarkOpacity: 15, watermarkColor: '#FFFFFF',
+      filterStrength: 100, logoPosition: 'bottom',
+    },
+    preview: { frame: '#F5F0E8', photoA: '#D4A862', photoB: '#8B4513', label: '#F5F0E8', accent: '#C07030' },
+  },
+  {
+    id: 'neon',
+    name: 'Neon',
+    design: {
+      frameColor: '#0A0A0A', labelBg: '#111111', labelTextColor: '#FFFFFF',
+      labelStyle: 'gradient', noteFont: 'uppercase',
+      dateStamp: true, dateStampColor: '#00FFC8', dateStampPosition: 'right',
+      watermark: true, watermarkOpacity: 10, watermarkColor: '#00FFC8',
+      filterStrength: 30, logoPosition: 'center',
+    },
+    preview: { frame: '#0A0A0A', photoA: '#001420', photoB: '#002A50', label: '#111111', accent: '#00FFC8' },
+  },
+  {
+    id: 'retro',
+    name: 'Retro',
+    design: {
+      frameColor: '#F5F0E8', labelBg: '#E8E0D0', labelTextColor: '#4A3728',
+      labelStyle: 'duotone', noteFont: 'caveat',
+      dateStamp: true, dateStampColor: '#8B4513', dateStampPosition: 'left',
+      watermark: true, watermarkOpacity: 25, watermarkColor: '#FFFFFF',
+      filterStrength: 70, logoPosition: 'bottom',
+    },
+    preview: { frame: '#F5F0E8', photoA: '#C8A060', photoB: '#704020', label: '#E8E0D0', accent: '#8B4513' },
+  },
+];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function getLuma(hex: string): number {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16) / 255;
+  const g = parseInt(h.slice(2, 4), 16) / 255;
+  const b = parseInt(h.slice(4, 6), 16) / 255;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function brandify(d: PolaroidDesign, accent: string): PolaroidDesign {
+  const isDark      = getLuma(d.frameColor) < 0.25;
+  const accentLight = getLuma(accent) > 0.65;
+  return {
+    ...d,
+    dateStamp:      true,
+    dateStampColor: accent,
+    labelStyle:     isDark ? 'accent-line' : (accentLight ? 'dots' : 'accent-line'),
+    watermark:      true,
+    watermarkColor: isDark ? accent : '#FFFFFF',
+  };
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 export default function PolaroidDesigner({
   eventId, eventName, accentColor, logoUrl, initialDesign,
 }: Props) {
@@ -27,6 +135,7 @@ export default function PolaroidDesigner({
   const testImgRef  = useRef<HTMLImageElement | null>(null);
 
   const [design,       setDesign]       = useState<PolaroidDesign>(initialDesign);
+  const [activeTheme,  setActiveTheme]  = useState<string | null>(null);
   const [previewNote,  setPreviewNote]  = useState('Best night ever ♥');
   const [showNote,     setShowNote]     = useState(false);
   const [hasTestPhoto, setHasTestPhoto] = useState(false);
@@ -44,16 +153,15 @@ export default function PolaroidDesigner({
     img.src = logoUrl;
   }, [logoUrl]);
 
-  // Re-render on every change
+  // Re-render on every design change
   const doRender = useCallback(async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     await renderPolaroid(canvas, {
-      design,
-      eventName,
-      logoImg:     logoImgRef.current,
-      noteText:    showNote ? previewNote : '',
-      photoEl:     testImgRef.current,
+      design, eventName,
+      logoImg:  logoImgRef.current,
+      noteText: showNote ? previewNote : '',
+      photoEl:  testImgRef.current,
       accentColor,
     });
   }, [design, eventName, showNote, previewNote, accentColor]);
@@ -62,6 +170,15 @@ export default function PolaroidDesigner({
 
   function set<K extends keyof PolaroidDesign>(key: K, val: PolaroidDesign[K]) {
     setDesign(d => ({ ...d, [key]: val }));
+  }
+
+  function applyTheme(theme: Theme) {
+    setDesign(d => ({ ...DEFAULT_DESIGN, ...theme.design, labelTagline: d.labelTagline }));
+    setActiveTheme(theme.id);
+  }
+
+  function applyBranding() {
+    setDesign(d => brandify(d, accentColor));
   }
 
   function handleTestPhoto(e: React.ChangeEvent<HTMLInputElement>) {
@@ -106,12 +223,12 @@ export default function PolaroidDesigner({
   return (
     <div className="flex flex-col" style={{ height: '100dvh', minHeight: '100vh', overflow: 'hidden' }}>
 
-      {/* ── Header ────────────────────────────────────────────────── */}
+      {/* ── Header ─────────────────────────────────────────────────── */}
       <header
         className="flex items-center justify-between px-5 shrink-0"
         style={{
-          height:       '52px',
-          background:   'rgba(255,255,255,0.96)',
+          height: '52px',
+          background: 'rgba(255,255,255,0.96)',
           borderBottom: '1px solid rgba(0,0,0,0.07)',
           backdropFilter: 'blur(12px)',
           zIndex: 30,
@@ -138,12 +255,10 @@ export default function PolaroidDesigner({
           {saveState === 'error' && (
             <span className="text-xs font-semibold text-red-500">Opslaan mislukt</span>
           )}
-          {/* Download preview */}
           <button
             onClick={handleDownload}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all hover:opacity-80"
             style={{ background: 'rgba(0,0,0,0.06)', color: '#6C7A8D', border: '1px solid rgba(0,0,0,0.08)' }}
-            title="Download preview als PNG"
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
               <path d="M2 9.5h8M6 2v6M3.5 5.5L6 8l2.5-2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
@@ -177,21 +292,77 @@ export default function PolaroidDesigner({
         </div>
       </header>
 
-      {/* ── Body ──────────────────────────────────────────────────── */}
+      {/* ── Body ───────────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* ── Controls panel ────────────────────────────────────────*/}
+        {/* ── Controls panel ──────────────────────────────────────── */}
         <aside
           className="shrink-0 overflow-y-auto"
-          style={{
-            width: '316px',
-            background: '#F4F6FA',
-            borderRight: '1px solid rgba(0,0,0,0.07)',
-          }}
+          style={{ width: '316px', background: '#F4F6FA', borderRight: '1px solid rgba(0,0,0,0.07)' }}
         >
           <div className="p-4 space-y-2.5">
 
-            {/* Frame & Label */}
+            {/* ── 1. THEMES ────────────────────────────────────────── */}
+            <div
+              className="rounded-xl p-3.5"
+              style={{ background: '#FFFFFF', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
+            >
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-muted mb-3">
+                Stijl kiezen
+              </p>
+
+              {/* Theme grid */}
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {THEMES.map(t => (
+                  <ThemeCard
+                    key={t.id}
+                    theme={t}
+                    active={activeTheme === t.id}
+                    accent={accentColor}
+                    onClick={() => applyTheme(t)}
+                  />
+                ))}
+              </div>
+
+              {/* Branded maken */}
+              <button
+                onClick={applyBranding}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all hover:opacity-90 active:scale-[0.98]"
+                style={{
+                  background: `linear-gradient(135deg, ${accentColor}18, ${accentColor}30)`,
+                  border:     `1.5px solid ${accentColor}40`,
+                  color:      accentColor,
+                }}
+              >
+                {/* Brand swatch */}
+                <span
+                  className="w-3 h-3 rounded-full shrink-0"
+                  style={{ background: accentColor, boxShadow: `0 0 0 2px ${accentColor}30` }}
+                />
+                Branded maken
+                <span className="opacity-60 font-medium text-[10px] normal-case">
+                  past merkkleur toe
+                </span>
+              </button>
+
+              {/* Reset */}
+              <button
+                onClick={() => { setDesign({ ...DEFAULT_DESIGN }); setActiveTheme(null); }}
+                className="w-full mt-1.5 py-1.5 rounded-lg text-[10px] font-bold text-muted hover:text-navy transition-colors text-center"
+                style={{ background: 'rgba(0,0,0,0.04)' }}
+              >
+                ↩ Reset naar standaard
+              </button>
+            </div>
+
+            {/* Divider label */}
+            <div className="flex items-center gap-2 px-1">
+              <div className="flex-1 h-px" style={{ background: 'rgba(0,0,0,0.08)' }} />
+              <span className="text-[9px] font-black uppercase tracking-[0.12em] text-muted">Handmatig aanpassen</span>
+              <div className="flex-1 h-px" style={{ background: 'rgba(0,0,0,0.08)' }} />
+            </div>
+
+            {/* ── 2. FRAME & LABEL ─────────────────────────────────── */}
             <Card title="Frame & Label">
               <Row label="Frame">
                 <Swatches value={design.frameColor} onChange={v => set('frameColor', v)}
@@ -207,12 +378,10 @@ export default function PolaroidDesigner({
               </Row>
             </Card>
 
-            {/* Film filter */}
+            {/* ── 3. FILM FILTER ───────────────────────────────────── */}
             <Card title="Film Filter">
               <div className="flex items-center gap-3 mb-2">
-                <span className="text-xs text-muted w-16 shrink-0">
-                  {design.filterStrength}%
-                </span>
+                <span className="text-xs text-muted w-16 shrink-0">{design.filterStrength}%</span>
                 <input type="range" min={0} max={100} step={5}
                   value={design.filterStrength}
                   onChange={e => set('filterStrength', +e.target.value)}
@@ -226,15 +395,14 @@ export default function PolaroidDesigner({
                     className="py-1.5 rounded-lg text-[10px] font-bold transition-all"
                     style={design.filterStrength === v
                       ? { background: `${accentColor}18`, color: accentColor, border: `1px solid ${accentColor}35` }
-                      : { background: 'rgba(0,0,0,0.06)', color: '#8A94A6', border: '1px solid transparent' }
-                    }>
+                      : { background: 'rgba(0,0,0,0.06)', color: '#8A94A6', border: '1px solid transparent' }}>
                     {lbl}
                   </button>
                 ))}
               </div>
             </Card>
 
-            {/* Datum stempel */}
+            {/* ── 4. DATUM STEMPEL ─────────────────────────────────── */}
             <Card title="Datum Stempel">
               <Row label="Tonen">
                 <Toggle value={design.dateStamp} onChange={v => set('dateStamp', v)} accent={accentColor} />
@@ -251,8 +419,7 @@ export default function PolaroidDesigner({
                         className="flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all"
                         style={design.dateStampPosition === p
                           ? { background: `${accentColor}18`, color: accentColor, border: `1px solid ${accentColor}35` }
-                          : { background: 'rgba(0,0,0,0.06)', color: '#8A94A6', border: '1px solid transparent' }
-                        }>
+                          : { background: 'rgba(0,0,0,0.06)', color: '#8A94A6', border: '1px solid transparent' }}>
                         {p === 'left' ? '← Links' : 'Rechts →'}
                       </button>
                     ))}
@@ -261,10 +428,10 @@ export default function PolaroidDesigner({
               </>)}
             </Card>
 
-            {/* Watermark */}
+            {/* ── 5. WATERMARK ─────────────────────────────────────── */}
             <Card title="Event Watermark">
               <p className="text-[11px] text-muted -mt-1 mb-2 leading-snug">
-                Eventnaam als transparante tekst over het midden van de foto
+                Eventnaam transparant over het midden van de foto
               </p>
               <Row label="Tonen">
                 <Toggle value={design.watermark} onChange={v => set('watermark', v)} accent={accentColor} />
@@ -285,8 +452,7 @@ export default function PolaroidDesigner({
                         className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold transition-all"
                         style={design.watermarkColor === col
                           ? { background: `${accentColor}18`, color: accentColor, border: `1px solid ${accentColor}35` }
-                          : { background: 'rgba(0,0,0,0.06)', color: '#8A94A6', border: '1px solid transparent' }
-                        }>
+                          : { background: 'rgba(0,0,0,0.06)', color: '#8A94A6', border: '1px solid transparent' }}>
                         <span className="w-2 h-2 rounded-full shrink-0"
                           style={{ background: col, border: col === '#FFFFFF' ? '1px solid rgba(0,0,0,0.2)' : '1px solid transparent' }} />
                         {lbl}
@@ -297,34 +463,10 @@ export default function PolaroidDesigner({
               </>)}
             </Card>
 
-            {/* Logo in label */}
-            <Card title="Logo in Label">
-              <p className="text-[11px] text-muted -mt-1 mb-2 leading-snug">
-                Logo/naam weergave onderaan de polaroid (zonder herinnering)
-              </p>
-              <div className="grid grid-cols-3 gap-1.5">
-                {([
-                  ['center', 'Centrum',  '⊞'],
-                  ['bottom', 'Onderaan', '⊟'],
-                  ['hidden', 'Verborgen','⊘'],
-                ] as [PolaroidDesign['logoPosition'], string, string][]).map(([val, lbl, ico]) => (
-                  <button key={val} onClick={() => set('logoPosition', val)}
-                    className="py-3 rounded-xl flex flex-col items-center gap-1 text-[10px] font-bold transition-all"
-                    style={design.logoPosition === val
-                      ? { background: `${accentColor}12`, color: accentColor, border: `1.5px solid ${accentColor}40` }
-                      : { background: 'rgba(0,0,0,0.06)', color: '#8A94A6', border: '1.5px solid transparent' }
-                    }>
-                    <span className="text-[15px] leading-none">{ico}</span>
-                    {lbl}
-                  </button>
-                ))}
-              </div>
-            </Card>
-
-            {/* Label Design Stijlen */}
+            {/* ── 6. LABEL DESIGN ──────────────────────────────────── */}
             <Card title="Label Design">
               <p className="text-[11px] text-muted -mt-1 mb-3 leading-snug">
-                Visuele stijl voor het witte vlak — past zich aan jouw merkkleur aan
+                Visuele stijl — past zich aan jouw merkkleur aan
               </p>
               <div className="grid grid-cols-3 gap-2">
                 {([
@@ -338,36 +480,16 @@ export default function PolaroidDesigner({
                   <button key={val} onClick={() => set('labelStyle', val)}
                     className="rounded-xl overflow-hidden transition-all"
                     style={{
-                      border: design.labelStyle === val
-                        ? `2px solid ${accentColor}`
-                        : '2px solid rgba(0,0,0,0.08)',
+                      border:       design.labelStyle === val ? `2px solid ${accentColor}` : '2px solid rgba(0,0,0,0.08)',
                       outline:      design.labelStyle === val ? `2px solid ${accentColor}30` : 'none',
                       outlineOffset: '1px',
                     }}>
-                    {/* Mini label preview */}
                     <div style={{ height: '34px', background: design.labelBg, position: 'relative', overflow: 'hidden' }}>
-                      {pat === 'line' && (
-                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: accentColor }} />
-                      )}
-                      {pat === 'gradient' && (
-                        <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(180deg, ${accentColor}44 0%, transparent 100%)` }} />
-                      )}
-                      {pat === 'duotone' && (
-                        <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(135deg, ${accentColor}44 0%, transparent 60%)` }} />
-                      )}
-                      {pat === 'dots' && (
-                        <div style={{
-                          position: 'absolute', inset: 0,
-                          backgroundImage: `radial-gradient(circle, ${accentColor}44 1px, transparent 1px)`,
-                          backgroundSize: '7px 7px',
-                        }} />
-                      )}
-                      {pat === 'grain' && (
-                        <div style={{
-                          position: 'absolute', inset: 0,
-                          backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.75\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\' opacity=\'0.08\'/%3E%3C/svg%3E")',
-                        }} />
-                      )}
+                      {pat === 'line'     && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: accentColor }} />}
+                      {pat === 'gradient' && <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(180deg, ${accentColor}44 0%, transparent 100%)` }} />}
+                      {pat === 'duotone'  && <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(135deg, ${accentColor}44 0%, transparent 60%)` }} />}
+                      {pat === 'dots'     && <div style={{ position: 'absolute', inset: 0, backgroundImage: `radial-gradient(circle, ${accentColor}44 1px, transparent 1px)`, backgroundSize: '7px 7px' }} />}
+                      {pat === 'grain'    && <div style={{ position: 'absolute', inset: 0, backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.75\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\' opacity=\'0.08\'/%3E%3C/svg%3E")' }} />}
                     </div>
                     <div className="py-1 text-[10px] font-bold text-center"
                       style={{ color: design.labelStyle === val ? accentColor : '#8A94A6', background: 'rgba(0,0,0,0.03)' }}>
@@ -378,10 +500,33 @@ export default function PolaroidDesigner({
               </div>
             </Card>
 
-            {/* Label Tagline */}
+            {/* ── 7. LOGO POSITIE ──────────────────────────────────── */}
+            <Card title="Logo in Label">
+              <p className="text-[11px] text-muted -mt-1 mb-2 leading-snug">
+                Logo/naam weergave (zichtbaar zonder herinnering)
+              </p>
+              <div className="grid grid-cols-3 gap-1.5">
+                {([
+                  ['center', 'Centrum',  '⊞'],
+                  ['bottom', 'Onderaan', '⊟'],
+                  ['hidden', 'Verborgen','⊘'],
+                ] as [PolaroidDesign['logoPosition'], string, string][]).map(([val, lbl, ico]) => (
+                  <button key={val} onClick={() => set('logoPosition', val)}
+                    className="py-3 rounded-xl flex flex-col items-center gap-1 text-[10px] font-bold transition-all"
+                    style={design.logoPosition === val
+                      ? { background: `${accentColor}12`, color: accentColor, border: `1.5px solid ${accentColor}40` }
+                      : { background: 'rgba(0,0,0,0.06)', color: '#8A94A6', border: '1.5px solid transparent' }}>
+                    <span className="text-[15px] leading-none">{ico}</span>
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+            </Card>
+
+            {/* ── 8. TAGLINE ───────────────────────────────────────── */}
             <Card title="Label Tagline">
               <p className="text-[11px] text-muted -mt-1 mb-2 leading-snug">
-                Vaste tekst onderaan de polaroid — bijv. eventnaam, datum of #hashtag
+                Vaste tekst onderaan — bijv. eventnaam, datum of #hashtag
               </p>
               <div className="relative">
                 <input
@@ -392,11 +537,8 @@ export default function PolaroidDesigner({
                   maxLength={40}
                   className="w-full px-3 py-2 rounded-xl text-xs outline-none"
                   style={{
-                    background:   'rgba(0,0,0,0.05)',
-                    border:       '1px solid rgba(0,0,0,0.09)',
-                    color:        '#07162F',
-                    fontFamily:   'Inter, sans-serif',
-                    paddingRight: '36px',
+                    background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.09)',
+                    color: '#07162F', paddingRight: '36px',
                   }}
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold tabular-nums"
@@ -412,11 +554,8 @@ export default function PolaroidDesigner({
               )}
             </Card>
 
-            {/* Note font */}
+            {/* ── 9. LETTERTYPE ────────────────────────────────────── */}
             <Card title="Herinnering Lettertype">
-              <p className="text-[11px] text-muted -mt-1 mb-3 leading-snug">
-                Hoe de geheugen-tekst op de polaroid verschijnt
-              </p>
               <div className="grid grid-cols-2 gap-2">
                 {([
                   ['caveat',    'Handschrift', 'Best night ever ♥', 'var(--font-caveat), Caveat, cursive', '18px'],
@@ -426,8 +565,7 @@ export default function PolaroidDesigner({
                     className="rounded-xl p-2.5 flex flex-col items-center gap-1.5 transition-all"
                     style={design.noteFont === val
                       ? { background: `${accentColor}12`, border: `1.5px solid ${accentColor}45` }
-                      : { background: 'rgba(0,0,0,0.05)', border: '1.5px solid transparent' }
-                    }>
+                      : { background: 'rgba(0,0,0,0.05)', border: '1.5px solid transparent' }}>
                     <span style={{ fontFamily: font, fontSize: size, fontWeight: val === 'uppercase' ? 900 : 700, color: '#2C1810', lineHeight: 1.2 }}>
                       {preview}
                     </span>
@@ -440,30 +578,22 @@ export default function PolaroidDesigner({
               </div>
             </Card>
 
-            {/* Reset */}
-            <button onClick={() => setDesign({ ...DEFAULT_DESIGN })}
-              className="w-full py-2.5 rounded-xl text-xs font-bold text-muted hover:text-navy transition-colors"
-              style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.07)' }}>
-              ↩ Reset naar standaard
-            </button>
           </div>
         </aside>
 
-        {/* ── Preview panel ──────────────────────────────────────────*/}
+        {/* ── Preview panel ────────────────────────────────────────── */}
         <main
           className="flex-1 flex flex-col items-center justify-center overflow-hidden relative"
-          style={{
-            background: 'radial-gradient(ellipse at 50% 40%, #1a2540 0%, #0a0f1e 100%)',
-          }}
+          style={{ background: 'radial-gradient(ellipse at 50% 40%, #1a2540 0%, #0a0f1e 100%)' }}
         >
-          {/* Subtle grid */}
+          {/* Grid */}
           <div className="absolute inset-0 pointer-events-none opacity-[0.04]"
             style={{
               backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
               backgroundSize: '40px 40px',
             }} />
 
-          {/* Polaroid canvas */}
+          {/* Canvas */}
           <div className="relative z-10" style={{ filter: 'drop-shadow(0 32px 64px rgba(0,0,0,0.70)) drop-shadow(0 8px 24px rgba(0,0,0,0.50))' }}>
             <canvas
               ref={canvasRef}
@@ -473,41 +603,31 @@ export default function PolaroidDesigner({
             />
           </div>
 
-          {/* Preview controls row — floats below polaroid */}
+          {/* Preview controls */}
           <div className="relative z-10 mt-6 flex items-center gap-3 flex-wrap justify-center px-4">
-            {/* Mode toggle */}
             <div className="flex rounded-xl overflow-hidden"
               style={{ border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.06)' }}>
               {[['Zonder tekst', false], ['Met herinnering', true]].map(([lbl, val]) => (
                 <button key={String(val)} onClick={() => setShowNote(val as boolean)}
                   className="px-3.5 py-1.5 text-xs font-bold transition-all"
-                  style={showNote === val
-                    ? { background: accentColor, color: '#fff' }
-                    : { color: 'rgba(255,255,255,0.45)' }
-                  }>
+                  style={showNote === val ? { background: accentColor, color: '#fff' } : { color: 'rgba(255,255,255,0.45)' }}>
                   {lbl as string}
                 </button>
               ))}
             </div>
 
-            {/* Note input — only when mode is active */}
             {showNote && (
-              <input type="text"
-                value={previewNote}
+              <input type="text" value={previewNote}
                 onChange={e => setPreviewNote(e.target.value.slice(0, 40))}
                 placeholder="Best night ever ♥"
                 className="px-4 py-1.5 rounded-xl outline-none text-white placeholder-white/30"
                 style={{
-                  background:  'rgba(255,255,255,0.08)',
-                  border:      '1px solid rgba(255,255,255,0.14)',
-                  fontFamily:  'var(--font-caveat), Caveat, cursive',
-                  fontSize:    '20px',
-                  width:       '220px',
+                  background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)',
+                  fontFamily: 'var(--font-caveat), Caveat, cursive', fontSize: '20px', width: '220px',
                 }}
               />
             )}
 
-            {/* Test photo upload */}
             <label
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all hover:opacity-80"
               style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.55)' }}>
@@ -530,9 +650,7 @@ export default function PolaroidDesigner({
             )}
           </div>
 
-          {/* Hint */}
-          <p className="relative z-10 mt-4 text-[10px] font-medium"
-            style={{ color: 'rgba(255,255,255,0.18)' }}>
+          <p className="relative z-10 mt-4 text-[10px] font-medium" style={{ color: 'rgba(255,255,255,0.18)' }}>
             Exact hetzelfde als de echte polaroid
           </p>
         </main>
@@ -542,6 +660,67 @@ export default function PolaroidDesigner({
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
+
+function ThemeCard({ theme, active, accent, onClick }: {
+  theme: Theme; active: boolean; accent: string; onClick: () => void;
+}) {
+  const { preview: p } = theme;
+  const isLightFrame = getLuma(p.frame) > 0.5;
+
+  return (
+    <button
+      onClick={onClick}
+      className="rounded-xl overflow-hidden transition-all hover:scale-[1.03] active:scale-[0.97]"
+      style={{
+        border:        active ? `2px solid ${accent}` : '2px solid rgba(0,0,0,0.07)',
+        outline:       active ? `2px solid ${accent}28` : 'none',
+        outlineOffset: '1px',
+        background:    p.frame,
+      }}
+    >
+      {/* Mini polaroid body */}
+      <div style={{ padding: '5px 5px 0 5px' }}>
+        {/* Photo area */}
+        <div style={{
+          height: 56,
+          borderRadius: '2px',
+          background: `linear-gradient(145deg, ${p.photoA}, ${p.photoB})`,
+          position: 'relative',
+          overflow: 'hidden',
+        }}>
+          {/* Vignette hint */}
+          <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.35) 100%)' }} />
+        </div>
+        {/* Label bar */}
+        <div style={{
+          height: 18,
+          background: p.label,
+          position: 'relative',
+          overflow: 'hidden',
+          display: 'flex',
+          alignItems: 'center',
+          paddingLeft: 4,
+        }}>
+          {/* Accent hint line at top */}
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: p.accent, opacity: 0.7 }} />
+          {/* Stamp dot */}
+          <div style={{ width: 12, height: 5, borderRadius: 1, background: p.accent, opacity: 0.8 }} />
+        </div>
+      </div>
+
+      {/* Name label */}
+      <div
+        className="text-[9px] font-black text-center py-1.5 leading-none"
+        style={{
+          color:      active ? accent : (isLightFrame ? '#8A94A6' : 'rgba(255,255,255,0.45)'),
+          background: active ? `${accent}10` : 'transparent',
+        }}
+      >
+        {theme.name}
+      </div>
+    </button>
+  );
+}
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -582,25 +761,21 @@ function Swatches({ value, onChange, presets }: {
         <button key={c} onClick={() => onChange(c)} title={c}
           className="rounded-full transition-all hover:scale-110 shrink-0"
           style={{
-            width:       value === c ? '20px' : '18px',
-            height:      value === c ? '20px' : '18px',
-            background:  c,
-            border:      value === c ? '2px solid #1E8BFF' : '1.5px solid rgba(0,0,0,0.14)',
-            outline:     value === c ? '2px solid rgba(30,139,255,0.28)' : 'none',
+            width:    value === c ? '20px' : '18px',
+            height:   value === c ? '20px' : '18px',
+            background: c,
+            border:   value === c ? '2px solid #1E8BFF' : '1.5px solid rgba(0,0,0,0.14)',
+            outline:  value === c ? '2px solid rgba(30,139,255,0.28)' : 'none',
             outlineOffset: '1px',
-            boxShadow:   (c === '#FFFFFF' || c === '#FEFDF8' || c === '#F5F0E8')
+            boxShadow: (c === '#FFFFFF' || c === '#FEFDF8' || c === '#F5F0E8')
               ? 'inset 0 0 0 1px rgba(0,0,0,0.08)' : undefined,
           }}
         />
       ))}
-      {/* Custom */}
+      {/* Custom colour picker */}
       <label title="Eigen kleur"
         className="relative rounded-lg overflow-hidden cursor-pointer hover:scale-110 transition-all shrink-0"
-        style={{
-          width: '22px', height: '22px',
-          background: 'conic-gradient(red,yellow,lime,cyan,blue,magenta,red)',
-          border: '1.5px solid rgba(0,0,0,0.14)',
-        }}>
+        style={{ width: '22px', height: '22px', background: 'conic-gradient(red,yellow,lime,cyan,blue,magenta,red)', border: '1.5px solid rgba(0,0,0,0.14)' }}>
         <input type="color" value={value} onChange={e => onChange(e.target.value)}
           className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
       </label>
