@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import BackgroundPattern from '@/components/BackgroundPattern';
 import Header from '@/components/Header';
 import EventPhotoSession from '@/components/EventPhotoSession';
+import EventSplash from '@/components/EventSplash';
 
 export default async function EventPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -15,17 +16,25 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
 
   return (
     <main className="min-h-screen relative" style={{ backgroundColor: '#F7FBFF' }}>
-      {/* Subtle page color tint in event accent */}
+      {/* Subtle page tint in event accent */}
       <div
         className="fixed inset-0 pointer-events-none -z-10"
         style={{ background: `${event.accentColor}06` }}
       />
       <BackgroundPattern accentColor={event.accentColor} />
 
+      {/* Branded splash — shows once per session */}
+      <EventSplash
+        slug={slug}
+        accentColor={event.accentColor}
+        eventName={event.name}
+        logoUrl={event.logoUrl ?? undefined}
+      />
+
       {/* FestiDrop header */}
       <Header />
 
-      {/* Event branding is now inside the camera card — no sub-header clutter */}
+      {/* Camera */}
       <EventPhotoSession
         eventId={event.id}
         eventName={event.name}
