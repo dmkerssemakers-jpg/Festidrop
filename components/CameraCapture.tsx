@@ -31,30 +31,30 @@ function applyPolaroidFilter(
 
   for (let i = 0; i < 256; i++) {
     const n = i / 255;
-    // Strongly compress dynamic range → lifted blacks, compressed whites
-    const f = n * 0.70 + 0.15;
-    // Very gentle S-curve (flat Polaroid feel, not contrasty)
+    // Minder fade — schaduwen blijven donker, highlights vol
+    const f = n * 0.90 + 0.05;
+    // Sterkere S-curve → meer contrast, levendiger beeld
     const s = f - 0.5;
-    const c = Math.max(0, Math.min(1, 0.5 + s * (1 + 0.08 * (1 - 4 * s * s))));
+    const c = Math.max(0, Math.min(1, 0.5 + s * (1 + 0.22 * (1 - 4 * s * s))));
     const v = c * 255;
-    // Warm amber-brown shadows, crème highlights
-    R[i] = Math.max(0, Math.min(255, Math.round(v + 28)));                 // lift red (warm)
-    G[i] = Math.max(0, Math.min(255, Math.round(v + 10)));                 // slight warm green
-    B[i] = Math.max(0, Math.min(255, Math.round(v - 26 + (1 - n) * 14))); // kill blue in shadows, tiny lift in highs
+    // Warme kleurgradering — focust op midtonen, niet de schaduwen platslaan
+    R[i] = Math.max(0, Math.min(255, Math.round(v + 16)));                // warm rood
+    G[i] = Math.max(0, Math.min(255, Math.round(v + 5)));                 // lichte warmte
+    B[i] = Math.max(0, Math.min(255, Math.round(v - 12 + (1 - n) * 6))); // iets minder blauw, zachte schaduwen
   }
 
-  // LUT + 12% desaturation + film grain in one O(n) pass
+  // LUT + 8% desaturatie + filmkorrel
   for (let i = 0; i < d.length; i += 4) {
     let r = R[d[i]];
     let g = G[d[i + 1]];
     let b = B[d[i + 2]];
-    // Slight desaturation towards warm luminance
+    // Subtiele desaturatie (8%) — kleuren blijven levendig
     const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-    r = Math.round(r * 0.88 + lum * 0.12);
-    g = Math.round(g * 0.88 + lum * 0.12);
-    b = Math.round(b * 0.88 + lum * 0.12);
-    // Correlated film grain (subtle)
-    const grain = (Math.random() - 0.5) * 14;
+    r = Math.round(r * 0.92 + lum * 0.08);
+    g = Math.round(g * 0.92 + lum * 0.08);
+    b = Math.round(b * 0.92 + lum * 0.08);
+    // Filmkorrel — fijner dan voorheen
+    const grain = (Math.random() - 0.5) * 10;
     d[i]     = Math.max(0, Math.min(255, r + grain));
     d[i + 1] = Math.max(0, Math.min(255, g + grain * 0.88));
     d[i + 2] = Math.max(0, Math.min(255, b + grain * 0.72));
@@ -156,17 +156,12 @@ export default function CameraCapture({ onComplete }: Props) {
     // Apply Polaroid 600 film filter (grain + color grade + vignette + light leak)
     applyPolaroidFilter(ctx, pad, pad, img, img);
 
-    // Caption centred in the bottom white label area
-    // Bottom border runs from y=(pad+img) to y=H → centre = pad+img + POLAROID_BTM/2
-    const n = photosRef.current.length + 1;
-    const labelMidY = pad + img + POLAROID_BTM / 2; // ≈ 655
-    ctx.fillStyle = '#A0A8B5';
-    ctx.font = '600 15px Inter, sans-serif';
+    // Alleen FestiDrop branding — geen nummering
+    const labelMidY = pad + img + POLAROID_BTM / 2;
+    ctx.fillStyle = '#8A94A6';
+    ctx.font = '700 15px Inter, ui-sans-serif, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(`${n} / ${MAX}`, W / 2, labelMidY - 10);
-    ctx.fillStyle = '#B0BEC8';
-    ctx.font = '700 11px Inter, sans-serif';
-    ctx.fillText('FestiDrop', W / 2, labelMidY + 12);
+    ctx.fillText('FestiDrop', W / 2, labelMidY + 6);
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
 
