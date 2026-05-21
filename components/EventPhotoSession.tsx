@@ -12,7 +12,7 @@ interface Props {
   hasSubHeader?: boolean;
 }
 
-export default function EventPhotoSession({ eventId, eventName, slug, maxPhotos, logoUrl, hasSubHeader }: Props) {
+export default function EventPhotoSession({ eventId, eventName, accentColor, slug, maxPhotos, logoUrl, hasSubHeader }: Props) {
   const router = useRouter();
   const storageKey = `festidrop_photos_${slug}`;
 
@@ -30,6 +30,7 @@ export default function EventPhotoSession({ eventId, eventName, slug, maxPhotos,
       eventId={eventId}
       logoUrl={logoUrl}
       eventName={eventName}
+      accentColor={accentColor}
       topOffset={hasSubHeader ? 'pt-36' : 'pt-24'}
     />
   );

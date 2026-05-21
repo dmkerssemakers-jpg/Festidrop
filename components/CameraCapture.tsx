@@ -4,19 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ProgressStrip from './ProgressStrip';
 
 const MAX = 10;
-const FRAME_SIZE = 600;   // total canvas width (photo + side borders)
-const POLAROID_BTM = 150; // thick white label area (authentic Polaroid proportions ~28%)
+const FRAME_SIZE   = 600;
+const POLAROID_BTM = 150;
 
-// ── Authentic Polaroid film filter ───────────────────────────────
-// Based on real Polaroid 600 / OneStep film characteristics:
-//   • Black point lifted to warm amber-brown  (~R:56 G:42 B:28)
-//   • White point rolled off to warm crème    (~R:248 G:236 B:210)
-//   • Flat tonality — Polaroid is NOT punchy
-//   • 12% desaturation — muted, film-like palette
-//   • Subtle film grain  ±8 px
-//   • Medium vignette    dark edges
-//   • Warm light leak    top-right
-
+// ── Authentic Polaroid 600 film filter ───────────────────────────────
 function applyPolaroidFilter(
   ctx: CanvasRenderingContext2D,
   px: number, py: number, pw: number, ph: number
@@ -24,36 +15,29 @@ function applyPolaroidFilter(
   const imageData = ctx.getImageData(px, py, pw, ph);
   const d = imageData.data;
 
-  // Per-channel LUTs
   const R = new Uint8ClampedArray(256);
   const G = new Uint8ClampedArray(256);
   const B = new Uint8ClampedArray(256);
 
   for (let i = 0; i < 256; i++) {
     const n = i / 255;
-    // Minder fade — schaduwen blijven donker, highlights vol
     const f = n * 0.90 + 0.05;
-    // Sterkere S-curve → meer contrast, levendiger beeld
     const s = f - 0.5;
     const c = Math.max(0, Math.min(1, 0.5 + s * (1 + 0.22 * (1 - 4 * s * s))));
     const v = c * 255;
-    // Warme kleurgradering — focust op midtonen, niet de schaduwen platslaan
-    R[i] = Math.max(0, Math.min(255, Math.round(v + 16)));                // warm rood
-    G[i] = Math.max(0, Math.min(255, Math.round(v + 5)));                 // lichte warmte
-    B[i] = Math.max(0, Math.min(255, Math.round(v - 12 + (1 - n) * 6))); // iets minder blauw, zachte schaduwen
+    R[i] = Math.max(0, Math.min(255, Math.round(v + 16)));
+    G[i] = Math.max(0, Math.min(255, Math.round(v + 5)));
+    B[i] = Math.max(0, Math.min(255, Math.round(v - 12 + (1 - n) * 6)));
   }
 
-  // LUT + 8% desaturatie + filmkorrel
   for (let i = 0; i < d.length; i += 4) {
     let r = R[d[i]];
     let g = G[d[i + 1]];
     let b = B[d[i + 2]];
-    // Subtiele desaturatie (8%) — kleuren blijven levendig
     const lum = 0.299 * r + 0.587 * g + 0.114 * b;
     r = Math.round(r * 0.92 + lum * 0.08);
     g = Math.round(g * 0.92 + lum * 0.08);
     b = Math.round(b * 0.92 + lum * 0.08);
-    // Filmkorrel — fijner dan voorheen
     const grain = (Math.random() - 0.5) * 10;
     d[i]     = Math.max(0, Math.min(255, r + grain));
     d[i + 1] = Math.max(0, Math.min(255, g + grain * 0.88));
@@ -61,7 +45,6 @@ function applyPolaroidFilter(
   }
   ctx.putImageData(imageData, px, py);
 
-  // Vignette — medium, slightly oval
   const vig = ctx.createRadialGradient(
     px + pw / 2, py + ph / 2, pw * 0.26,
     px + pw / 2, py + ph / 2, pw * 0.70,
@@ -72,7 +55,6 @@ function applyPolaroidFilter(
   ctx.fillStyle = vig;
   ctx.fillRect(px, py, pw, ph);
 
-  // Light leak — warm amber from top-right (subtle, authentic)
   const leak = ctx.createRadialGradient(
     px + pw * 0.84, py + ph * 0.04, 0,
     px + pw * 0.84, py + ph * 0.04, pw * 0.52,
@@ -85,15 +67,23 @@ function applyPolaroidFilter(
 }
 
 type Props = {
-  onComplete: (photos: string[]) => void;
-  maxPhotos?: number;
-  eventId?: string;
-  logoUrl?: string | null;
-  eventName?: string;
-  topOffset?: string;
+  onComplete:   (photos: string[]) => void;
+  maxPhotos?:   number;
+  eventId?:     string;
+  logoUrl?:     string | null;
+  eventName?:   string;
+  accentColor?: string;
+  topOffset?:   string;
 };
 
-export default function CameraCapture({ onComplete, maxPhotos = MAX, logoUrl, eventName, topOffset = 'pt-24' }: Props) {
+export default function CameraCapture({
+  onComplete,
+  maxPhotos   = MAX,
+  logoUrl,
+  eventName,
+  accentColor = '#1E8BFF',
+  topOffset   = 'pt-24',
+}: Props) {
   const videoRef      = useRef<HTMLVideoElement>(null);
   const canvasRef     = useRef<HTMLCanvasElement>(null);
   const streamRef     = useRef<MediaStream | null>(null);
@@ -102,12 +92,12 @@ export default function CameraCapture({ onComplete, maxPhotos = MAX, logoUrl, ev
   const onCompleteRef = useRef(onComplete);
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
 
-  // Pre-load logo image so it's ready when shoot() fires
+  // Pre-load logo
   useEffect(() => {
     if (!logoUrl) { logoImgRef.current = null; return; }
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => { logoImgRef.current = img; };
+    img.onload  = () => { logoImgRef.current = img; };
     img.onerror = () => { logoImgRef.current = null; };
     img.src = logoUrl;
   }, [logoUrl]);
@@ -135,7 +125,6 @@ export default function CameraCapture({ onComplete, maxPhotos = MAX, logoUrl, ev
         setPermission('granted');
       }
     } catch (err: unknown) {
-      // NotAllowedError = user denied | NotFoundError/OverconstrainedError = no camera
       const name = (err instanceof Error) ? err.name : '';
       setDeniedReason(name === 'NotFoundError' || name === 'OverconstrainedError' ? 'unavailable' : 'blocked');
       setPermission('denied');
@@ -144,7 +133,7 @@ export default function CameraCapture({ onComplete, maxPhotos = MAX, logoUrl, ev
 
   useEffect(() => () => { streamRef.current?.getTracks().forEach(t => t.stop()); }, []);
 
-  // ── Capture one photo ────────────────────────────────────────────
+  // ── Capture photo ────────────────────────────────────────────────
   const shoot = useCallback(() => {
     if (isComplete || flashing || permission !== 'granted') return;
     const video  = videoRef.current;
@@ -152,18 +141,15 @@ export default function CameraCapture({ onComplete, maxPhotos = MAX, logoUrl, ev
     if (!video || !canvas) return;
 
     setFlashing(true);
-    if (navigator.vibrate) navigator.vibrate(80); // tactiele feedback op mobiel
+    if (navigator.vibrate) navigator.vibrate(80);
 
-    // Build polaroid frame on canvas
     const W = FRAME_SIZE, H = FRAME_SIZE + POLAROID_BTM;
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d')!;
 
-    // Authentic Polaroid white frame (slightly warm white)
     ctx.fillStyle = '#FEFDF8';
     ctx.fillRect(0, 0, W, H);
 
-    // Square-crop the video feed — pad=20 for authentic border proportions
     const pad = 20, img = W - pad * 2;
     const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
     let sx = 0, sy = 0, sw = vw, sh = vh;
@@ -171,22 +157,17 @@ export default function CameraCapture({ onComplete, maxPhotos = MAX, logoUrl, ev
     else             { sh = vw; sy = (vh - sh) / 2; }
     ctx.drawImage(video, sx, sy, sw, sh, pad, pad, img, img);
 
-    // Apply Polaroid 600 film filter (grain + color grade + vignette + light leak)
     applyPolaroidFilter(ctx, pad, pad, img, img);
 
-    // ── Polaroid label — logo of tekst ──────────────────────────
     const labelMidY = pad + img + POLAROID_BTM / 2;
-    const logoImg = logoImgRef.current;
-
+    const logoImg   = logoImgRef.current;
     if (logoImg) {
-      // Schaal logo zodat het past in de witte ruimte (max breedte 200px, max hoogte 60px)
       const maxW = 200, maxH = 60;
       const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight, 1);
       const lw = logoImg.naturalWidth * ratio;
       const lh = logoImg.naturalHeight * ratio;
       ctx.drawImage(logoImg, W / 2 - lw / 2, labelMidY - lh / 2, lw, lh);
     } else {
-      // Tekst: event naam of FestiDrop fallback
       const label = eventName ?? 'FestiDrop';
       ctx.fillStyle = '#8A94A6';
       ctx.font = '700 15px Inter, ui-sans-serif, sans-serif';
@@ -196,62 +177,66 @@ export default function CameraCapture({ onComplete, maxPhotos = MAX, logoUrl, ev
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
 
-    // Delay to show flash, then update state
     setTimeout(() => {
       setFlashing(false);
       photosRef.current = [...photosRef.current, dataUrl];
       const nextCount = photosRef.current.length;
       setCount(nextCount);
 
-      // Call onComplete outside of any setState callback
       if (nextCount === maxPhotos) {
-        // Stop camera stream zodra sessie klaar is
         streamRef.current?.getTracks().forEach(t => t.stop());
         streamRef.current = null;
         const allPhotos = photosRef.current.slice();
         setTimeout(() => onCompleteRef.current(allPhotos), 350);
       }
     }, 160);
-  }, [isComplete, flashing, permission, maxPhotos]);
+  }, [isComplete, flashing, permission, maxPhotos, eventName]);
 
-  // ── Countdown → fires shoot when it hits 0 ───────────────────────
+  // ── Countdown ────────────────────────────────────────────────────
   useEffect(() => {
     if (countdown === null) return;
-    if (countdown === 0) {
-      setCountdown(null);
-      shoot();
-      return;
-    }
+    if (countdown === 0) { setCountdown(null); shoot(); return; }
     const t = setTimeout(() => setCountdown(c => c !== null ? c - 1 : null), 1000);
     return () => clearTimeout(t);
   }, [countdown, shoot]);
 
-  // ── Start countdown on button press ─────────────────────────────
   const handleShutterPress = useCallback(() => {
     if (isComplete || flashing || permission !== 'granted' || countdown !== null) return;
     setCountdown(2);
   }, [isComplete, flashing, permission, countdown]);
 
-  // ── Status line ──────────────────────────────────────────────────
   const statusText =
-    count === 0      ? 'Richt de camera en druk op de knop 📸'
+    count === 0       ? 'Richt de camera en druk op de knop 📸'
     : remaining === 1 ? 'Laatste foto — maak hem speciaal! ✨'
     : `Nog ${remaining} te gaan — ga door!`;
 
   // ── Render ───────────────────────────────────────────────────────
   return (
-    <section id="camera" className={`px-5 pb-16 max-w-md mx-auto ${topOffset}`}>
+    <section id="camera" className={`px-4 pb-16 max-w-md mx-auto ${topOffset}`}>
       <motion.div
-        initial={{ opacity: 0, y: 24 }}
+        initial={{ opacity: 0, y: 28 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-        className="relative glass-card rounded-[28px] overflow-hidden"
+        transition={{ duration: 0.65, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
+        className="relative rounded-[28px] overflow-hidden"
+        style={{
+          background: 'rgba(7,22,47,0.88)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          boxShadow: `0 32px 80px rgba(7,22,47,0.32), 0 0 0 1px rgba(255,255,255,0.04), 0 0 80px ${accentColor}22`,
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+        }}
       >
+        {/* Accent glow line at top */}
+        <div
+          className="absolute top-0 left-0 right-0 h-px"
+          style={{ background: `linear-gradient(90deg, transparent, ${accentColor}60, transparent)` }}
+        />
+
         {/* Flash overlay */}
         <AnimatePresence>
           {flashing && (
             <motion.div key="flash"
-              initial={{ opacity: 0 }} animate={{ opacity: 0.88 }} exit={{ opacity: 0 }}
+              initial={{ opacity: 0 }} animate={{ opacity: 0.9 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.13 }}
               className="absolute inset-0 bg-white z-20 pointer-events-none rounded-[28px]"
             />
@@ -261,33 +246,50 @@ export default function CameraCapture({ onComplete, maxPhotos = MAX, logoUrl, ev
         {/* Header bar */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-capture animate-red-ping" />
-            <span className="text-[11px] font-black uppercase tracking-[0.1em] text-muted">
-              FestiDrop Camera
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-red-ping" />
+            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-white/35">
+              Live
             </span>
           </div>
-          <span className="text-xs font-bold text-muted">{count}/{maxPhotos}</span>
+          <div
+            className="px-2.5 py-1 rounded-full text-[10px] font-black"
+            style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)' }}
+          >
+            {count}/{maxPhotos}
+          </div>
         </div>
 
         {/* Viewfinder */}
-        <div className="mx-5 rounded-2xl overflow-hidden bg-navy aspect-square relative">
+        <div className="mx-4 rounded-2xl overflow-hidden aspect-square relative"
+          style={{ background: '#000' }}>
 
           {/* Permission: idle */}
           {permission === 'idle' && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
-                   style={{ background: 'rgba(30,139,255,0.15)' }}>
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                  <rect x="2" y="9" width="28" height="20" rx="4" stroke="#1E8BFF" strokeWidth="2"/>
-                  <circle cx="16" cy="19" r="6" stroke="#1E8BFF" strokeWidth="2"/>
-                  <path d="M11 9V7.5A1.5 1.5 0 0112.5 6h7A1.5 1.5 0 0121 7.5V9"
-                    stroke="#1E8BFF" strokeWidth="2" strokeLinecap="round"/>
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 p-6">
+              <motion.div
+                animate={{ scale: [1, 1.06, 1] }}
+                transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+                className="w-20 h-20 rounded-3xl flex items-center justify-center"
+                style={{ background: `${accentColor}20`, border: `1px solid ${accentColor}30` }}
+              >
+                <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+                  <rect x="2" y="10" width="32" height="22" rx="5" stroke={accentColor} strokeWidth="2"/>
+                  <circle cx="18" cy="21" r="7" stroke={accentColor} strokeWidth="2"/>
+                  <path d="M12 10V8.5A2.5 2.5 0 0114.5 6h7A2.5 2.5 0 0124 8.5V10"
+                    stroke={accentColor} strokeWidth="2" strokeLinecap="round"/>
                 </svg>
+              </motion.div>
+              <div className="text-center">
+                <p className="text-white/80 text-sm font-bold mb-1">Camera nodig</p>
+                <p className="text-white/40 text-xs leading-relaxed">
+                  FestiDrop heeft toegang tot je camera nodig om foto&apos;s te maken.
+                </p>
               </div>
-              <p className="text-white/70 text-sm text-center leading-relaxed">
-                FestiDrop heeft toegang nodig tot je camera om foto's te maken.
-              </p>
-              <button onClick={startCamera} className="btn-primary px-6 py-3 text-sm">
+              <button
+                onClick={startCamera}
+                className="px-8 py-3 rounded-full text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
+                style={{ background: `linear-gradient(135deg, ${accentColor}, ${accentColor}CC)` }}
+              >
                 Camera inschakelen
               </button>
             </div>
@@ -296,7 +298,10 @@ export default function CameraCapture({ onComplete, maxPhotos = MAX, logoUrl, ev
           {/* Permission: requesting */}
           {permission === 'requesting' && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-8 h-8 border-2 border-azure border-t-transparent rounded-full animate-spin" />
+              <div
+                className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin"
+                style={{ borderColor: `${accentColor}60`, borderTopColor: 'transparent' }}
+              />
             </div>
           )}
 
@@ -310,24 +315,21 @@ export default function CameraCapture({ onComplete, maxPhotos = MAX, logoUrl, ev
                   <path d="M14 8v8M14 19v1.5" stroke="rgba(255,120,120,0.9)" strokeWidth="2" strokeLinecap="round"/>
                 </svg>
               </div>
-
               {deniedReason === 'blocked' ? (
                 <>
                   <div>
                     <p className="text-white/80 text-sm font-semibold mb-1">Camera-toegang geweigerd</p>
-                    <p className="text-white/50 text-xs leading-relaxed">
-                      Klik op het camera-icoon in de adresbalk van je browser en kies <strong className="text-white/70">"Toestaan"</strong>.
+                    <p className="text-white/40 text-xs leading-relaxed">
+                      Klik op het camera-icoon in de adresbalk en kies <strong className="text-white/60">&ldquo;Toestaan&rdquo;</strong>.
                     </p>
                   </div>
                   <button onClick={startCamera}
-                    className="px-5 py-2.5 rounded-full text-sm font-bold text-white border border-white/20 hover:border-white/40 transition-colors">
+                    className="px-5 py-2.5 rounded-full text-sm font-bold text-white border border-white/15 hover:border-white/30 transition-colors">
                     Probeer opnieuw
                   </button>
                 </>
               ) : (
-                <p className="text-white/60 text-sm leading-relaxed">
-                  Geen camera gevonden op dit apparaat.
-                </p>
+                <p className="text-white/50 text-sm leading-relaxed">Geen camera gevonden op dit apparaat.</p>
               )}
             </div>
           )}
@@ -338,13 +340,17 @@ export default function CameraCapture({ onComplete, maxPhotos = MAX, logoUrl, ev
             style={{ display: permission === 'granted' ? 'block' : 'none' }}
           />
 
-          {/* Viewfinder corners */}
+          {/* Viewfinder corners — accent color */}
           {permission === 'granted' && !isComplete && (
             <>
-              <div className="absolute top-3 left-3 w-6 h-6 border-t-2 border-l-2 border-white/40 rounded-tl" />
-              <div className="absolute top-3 right-3 w-6 h-6 border-t-2 border-r-2 border-white/40 rounded-tr" />
-              <div className="absolute bottom-3 left-3 w-6 h-6 border-b-2 border-l-2 border-white/40 rounded-bl" />
-              <div className="absolute bottom-3 right-3 w-6 h-6 border-b-2 border-r-2 border-white/40 rounded-br" />
+              <div className="absolute top-3 left-3 w-7 h-7 border-t-2 border-l-2 rounded-tl"
+                style={{ borderColor: `${accentColor}90` }} />
+              <div className="absolute top-3 right-3 w-7 h-7 border-t-2 border-r-2 rounded-tr"
+                style={{ borderColor: `${accentColor}90` }} />
+              <div className="absolute bottom-3 left-3 w-7 h-7 border-b-2 border-l-2 rounded-bl"
+                style={{ borderColor: `${accentColor}90` }} />
+              <div className="absolute bottom-3 right-3 w-7 h-7 border-b-2 border-r-2 rounded-br"
+                style={{ borderColor: `${accentColor}90` }} />
             </>
           )}
 
@@ -353,15 +359,19 @@ export default function CameraCapture({ onComplete, maxPhotos = MAX, logoUrl, ev
             {countdown !== null && countdown > 0 && (
               <motion.div
                 className="absolute inset-0 flex items-center justify-center z-10"
-                style={{ background: 'rgba(7,22,47,0.55)' }}
+                style={{ background: 'rgba(7,22,47,0.6)' }}
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               >
                 <AnimatePresence mode="wait">
                   <motion.span
                     key={countdown}
                     className="font-black text-white select-none"
-                    style={{ fontSize: '108px', lineHeight: 1, textShadow: '0 0 60px rgba(30,139,255,0.7), 0 4px 32px rgba(0,0,0,0.6)' }}
-                    initial={{ scale: 1.7, opacity: 0 }}
+                    style={{
+                      fontSize: '112px',
+                      lineHeight: 1,
+                      textShadow: `0 0 60px ${accentColor}80, 0 4px 32px rgba(0,0,0,0.7)`,
+                    }}
+                    initial={{ scale: 1.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.3, opacity: 0 }}
                     transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
@@ -375,65 +385,94 @@ export default function CameraCapture({ onComplete, maxPhotos = MAX, logoUrl, ev
 
           {/* Complete overlay */}
           {isComplete && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2"
-                 style={{ background: 'rgba(7,22,47,0.72)' }}>
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3"
+                 style={{ background: 'rgba(7,22,47,0.82)' }}>
+              <motion.div
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 280, damping: 18 }}
+                className="w-16 h-16 rounded-full flex items-center justify-center"
+                style={{ background: `${accentColor}25`, border: `2px solid ${accentColor}60` }}
+              >
+                <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                  <path d="M5 14l7 7 11-11" stroke={accentColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </motion.div>
               <p className="text-white font-black text-xl">Klaar! 🎉</p>
-              <p className="text-white/60 text-sm">Je drop wordt klaargemaakt…</p>
+              <p className="text-white/50 text-sm">Je drop wordt klaargemaakt…</p>
             </div>
           )}
         </div>
 
         {/* Stats + shutter */}
-        <div className="flex items-center justify-between px-6 mt-5 mb-4">
+        <div className="flex items-center justify-between px-6 mt-5 mb-2">
+          {/* Foto count */}
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.1em] text-muted mb-0.5">Foto's</p>
-            <p className="text-[28px] font-black leading-none tracking-[-0.04em] text-navy">
-              {count}<span className="text-sm font-bold text-muted">/{maxPhotos}</span>
+            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/30 mb-0.5">Foto&apos;s</p>
+            <p className="text-[28px] font-black leading-none tracking-[-0.04em] text-white">
+              {count}
+              <span className="text-sm font-bold text-white/25">/{maxPhotos}</span>
             </p>
           </div>
 
+          {/* Shutter button */}
           <motion.button
             onClick={handleShutterPress}
-            whileTap={(isComplete || permission !== 'granted' || countdown !== null) ? {} : { scale: 0.87 }}
+            whileTap={(isComplete || permission !== 'granted' || countdown !== null) ? {} : { scale: 0.86 }}
             disabled={isComplete || permission !== 'granted' || countdown !== null}
             aria-label="Maak foto"
-            className="w-[76px] h-[76px] rounded-full flex items-center justify-center focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-[80px] h-[80px] rounded-full flex items-center justify-center focus:outline-none disabled:opacity-35 disabled:cursor-not-allowed"
             style={{
               background: 'linear-gradient(145deg, #FF3838, #C00000)',
-              boxShadow: '0 10px 30px rgba(255,30,30,0.38), inset 0 1px 0 rgba(255,255,255,0.18)',
+              boxShadow: permission === 'granted' && !isComplete
+                ? '0 12px 32px rgba(255,30,30,0.45), inset 0 1px 0 rgba(255,255,255,0.18)'
+                : '0 6px 16px rgba(255,30,30,0.2)',
             }}
           >
-            <div className="w-[56px] h-[56px] rounded-full border-2 border-white/35 flex items-center justify-center">
-              <div className="w-[38px] h-[38px] rounded-full bg-white/[0.18]" />
+            <div className="w-[58px] h-[58px] rounded-full border-2 border-white/30 flex items-center justify-center">
+              <div className="w-[40px] h-[40px] rounded-full bg-white/[0.15]" />
             </div>
           </motion.button>
 
+          {/* Te gaan */}
           <div className="text-right">
-            <p className="text-[10px] font-black uppercase tracking-[0.1em] text-muted mb-0.5">Te gaan</p>
-            <p className="text-[28px] font-black leading-none tracking-[-0.04em]"
-               style={remaining === 0 ? {
-                 background: 'linear-gradient(90deg,#1E8BFF,#20D6E8)',
-                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-               } : { color: '#07162F' }}>
+            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/30 mb-0.5">Te gaan</p>
+            <p
+              className="text-[28px] font-black leading-none tracking-[-0.04em]"
+              style={remaining === 0
+                ? { color: accentColor, filter: `drop-shadow(0 0 12px ${accentColor}80)` }
+                : { color: '#fff' }
+              }
+            >
               {remaining}
             </p>
           </div>
         </div>
 
         {/* Progress + status */}
-        <div className="px-5 pb-5">
-          <ProgressStrip count={count} />
+        <div className="px-5 pb-6">
+          <ProgressStrip count={count} maxPhotos={maxPhotos} accentColor={accentColor} />
+
           <AnimatePresence mode="wait">
             {isComplete ? (
-              <motion.div key="done" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                className="mt-4 text-center py-3 rounded-2xl"
-                style={{ background: 'linear-gradient(135deg,rgba(30,139,255,0.08),rgba(32,214,232,0.12))' }}>
-                <p className="text-sm font-black text-navy">Je FestiDrop is klaar!</p>
-                <p className="text-xs text-muted mt-0.5">Scroll omlaag en vul je e-mail in.</p>
+              <motion.div
+                key="done"
+                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                className="mt-5 text-center py-3 rounded-2xl"
+                style={{ background: `${accentColor}15`, border: `1px solid ${accentColor}30` }}
+              >
+                <p className="text-sm font-black text-white">Je FestiDrop is klaar!</p>
+                <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                  Scroll omlaag en vul je e-mail in.
+                </p>
               </motion.div>
             ) : (
-              <motion.p key="status" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                className="text-center text-xs text-muted mt-4 font-medium">
+              <motion.p
+                key="status"
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                className="text-center text-xs mt-4 font-medium"
+                style={{ color: 'rgba(255,255,255,0.35)' }}
+              >
                 {statusText}
               </motion.p>
             )}
