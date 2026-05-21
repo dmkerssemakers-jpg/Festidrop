@@ -352,7 +352,7 @@ export default function CameraCapture({
                 </p>
               </div>
               <button
-                onClick={startCamera}
+                onClick={() => startCamera()}
                 className="px-8 py-3 rounded-full text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
                 style={{
                   background: `linear-gradient(135deg, ${accentColor}, ${accentColor}CC)`,
