@@ -9,8 +9,27 @@ interface Props {
 }
 
 const nav = [
-  { href: '/admin', label: 'Dashboard', icon: '▤' },
-  { href: '/admin/events', label: 'Events', icon: '◈' },
+  {
+    href: '/admin', label: 'Dashboard',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity=".9"/>
+        <rect x="9" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity=".9"/>
+        <rect x="1" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity=".9"/>
+        <rect x="9" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity=".9"/>
+      </svg>
+    ),
+  },
+  {
+    href: '/admin/events', label: 'Events',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <rect x="1" y="3" width="14" height="11" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M5 3V2M11 3V2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M1 6h14" stroke="currentColor" strokeWidth="1.5"/>
+      </svg>
+    ),
+  },
 ];
 
 export default function AdminSidebar({ user }: Props) {
@@ -26,7 +45,7 @@ export default function AdminSidebar({ user }: Props) {
     >
       {/* Logo */}
       <div className="px-6 py-5 border-b" style={{ borderColor: 'rgba(189,239,255,0.12)' }}>
-        <FestiDropLogo size="sm" />
+        <FestiDropLogo size="sm" onDark />
         <p className="text-[10px] font-bold uppercase tracking-[0.14em] mt-1.5" style={{ color: 'rgba(189,239,255,0.45)' }}>
           Dashboard
         </p>
@@ -48,7 +67,7 @@ export default function AdminSidebar({ user }: Props) {
                 : { color: 'rgba(189,239,255,0.55)' }
               }
             >
-              <span style={{ fontSize: '15px' }}>{item.icon}</span>
+              {item.icon}
               {item.label}
             </Link>
           );

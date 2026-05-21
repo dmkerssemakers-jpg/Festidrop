@@ -42,14 +42,14 @@ export function FestiDropIcon({ className = '' }: { className?: string }) {
 
 type LogoSize = 'sm' | 'md' | 'lg';
 
-export function FestiDropLogo({ size = 'md' }: { size?: LogoSize }) {
+export function FestiDropLogo({ size = 'md', onDark = false }: { size?: LogoSize; onDark?: boolean }) {
   const iconCls: Record<LogoSize, string> = { sm: 'w-7 h-7', md: 'w-10 h-10', lg: 'w-14 h-14' };
   const textCls: Record<LogoSize, string> = { sm: 'text-xl', md: 'text-2xl', lg: 'text-4xl' };
   return (
     <div className="flex items-center gap-2.5">
       <FestiDropIcon className={iconCls[size]} />
       <span className={`font-extrabold tracking-[-0.045em] ${textCls[size]}`}>
-        <span className="text-navy">Festi</span>
+        <span className={onDark ? 'text-white' : 'text-navy'}>Festi</span>
         <span className="text-gradient-drop">Drop</span>
       </span>
     </div>
