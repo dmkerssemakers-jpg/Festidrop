@@ -57,7 +57,7 @@ export default function SendPageClient({ slug, accentColor, eventName, logoUrl }
         </div>
       </header>
 
-      {/* ── Event sub-label (if event name) ───────────────── */}
+      {/* ── Event sub-label — always text only, never logo img ── */}
       {eventName && (
         <div
           className="fixed left-0 right-0 z-40 flex items-center justify-center gap-2 px-5 py-2"
@@ -68,20 +68,13 @@ export default function SendPageClient({ slug, accentColor, eventName, logoUrl }
             backdropFilter: 'blur(12px)',
           }}
         >
-          {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt={eventName} className="h-5 object-contain" />
-          ) : (
-            <>
-              <div className="w-4 h-4 rounded-md flex items-center justify-center text-white"
-                style={{ background: accentColor, fontSize: '7px', fontWeight: 900 }}>
-                ✦
-              </div>
-              <span className="text-[11px] font-black" style={{ color: accentColor }}>
-                {eventName}
-              </span>
-            </>
-          )}
+          <div className="w-4 h-4 rounded-md flex items-center justify-center text-white"
+            style={{ background: accentColor, fontSize: '7px', fontWeight: 900 }}>
+            ✦
+          </div>
+          <span className="text-[11px] font-black" style={{ color: accentColor }}>
+            {eventName}
+          </span>
         </div>
       )}
 

@@ -254,23 +254,15 @@ export default function CameraCapture({
           className="flex items-center justify-between px-5 pt-5 pb-4"
           style={{ borderBottom: `1px solid ${accentColor}20` }}
         >
-          {/* Event identity */}
+          {/* Event identity — always text, never logo img in small header */}
           <div className="flex items-center gap-3 min-w-0">
-            {logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={logoUrl}
-                alt={eventName ?? 'Event'}
-                className="object-contain shrink-0"
-                style={{ maxHeight: '32px', maxWidth: '120px' }}
-              />
-            ) : eventName ? (
+            {eventName ? (
               <>
                 <div
                   className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-white"
                   style={{
                     background: `linear-gradient(135deg, ${accentColor}, ${accentColor}BB)`,
-                    fontSize: '8px', fontWeight: 900,
+                    fontSize: '10px', fontWeight: 900,
                     boxShadow: `0 4px 12px ${accentColor}50`,
                   }}
                 >
