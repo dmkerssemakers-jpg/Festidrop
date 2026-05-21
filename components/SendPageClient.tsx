@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import BackgroundPattern from './BackgroundPattern';
 import { FestiDropLogo } from './Logo';
 import EmailDropCard from './EmailDropCard';
+import PhotoPreviewGallery from './PhotoPreviewGallery';
 
 interface Props {
   slug:         string;
@@ -20,7 +21,8 @@ export default function SendPageClient({ slug, accentColor, eventName, logoUrl }
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(storageKey);
+      // Try localStorage first, then sessionStorage fallback
+      const stored = localStorage.getItem(storageKey) ?? sessionStorage.getItem(storageKey);
       if (!stored) { router.replace(`/${slug}`); return; }
       const parsed = JSON.parse(stored) as string[];
       if (!Array.isArray(parsed) || parsed.length === 0) { router.replace(`/${slug}`); return; }
@@ -31,7 +33,8 @@ export default function SendPageClient({ slug, accentColor, eventName, logoUrl }
   }, [router, slug, storageKey]);
 
   function handleSent() {
-    localStorage.removeItem(storageKey);
+    try { localStorage.removeItem(storageKey); } catch { /* noop */ }
+    try { sessionStorage.removeItem(storageKey); } catch { /* noop */ }
   }
 
   if (!photos) {
@@ -145,11 +148,21 @@ export default function SendPageClient({ slug, accentColor, eventName, logoUrl }
           </motion.div>
         </motion.div>
 
+        {/* Photo preview gallery */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.32, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="mb-6"
+        >
+          <PhotoPreviewGallery photos={photos} accentColor={accentColor} />
+        </motion.div>
+
         {/* Email form card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.28, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ delay: 0.42, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
         >
           <EmailDropCard
             photos={photos}

@@ -34,6 +34,57 @@ function compressForEmail(dataUrl: string): Promise<string> {
 
 type State = 'idle' | 'sending' | 'sent' | 'error';
 
+function ShareButton({ accentColor }: { accentColor: string }) {
+  const [shared, setShared] = useState(false);
+
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+  if (!canShare) return null;
+
+  const handleShare = async () => {
+    try {
+      await navigator.share({
+        title: 'Mijn FestiDrop 📸',
+        text: 'Check mijn festivalfoto\'s via FestiDrop!',
+        url: window.location.origin,
+      });
+      setShared(true);
+    } catch {
+      // User cancelled — no action needed
+    }
+  };
+
+  return (
+    <button
+      onClick={handleShare}
+      className="flex items-center justify-center gap-2 w-full py-3 rounded-full text-sm font-bold transition-all hover:opacity-90 active:scale-[0.97]"
+      style={{
+        background: shared ? 'rgba(0,200,150,0.15)' : `${accentColor}18`,
+        border:     `1px solid ${shared ? 'rgba(0,200,150,0.3)' : `${accentColor}30`}`,
+        color:      shared ? '#00C896' : accentColor,
+      }}
+    >
+      {shared ? (
+        <>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M2 7l4 4 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Gedeeld!
+        </>
+      ) : (
+        <>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <circle cx="11" cy="3" r="1.8" stroke="currentColor" strokeWidth="1.4"/>
+            <circle cx="11" cy="11" r="1.8" stroke="currentColor" strokeWidth="1.4"/>
+            <circle cx="3" cy="7" r="1.8" stroke="currentColor" strokeWidth="1.4"/>
+            <path d="M4.7 6.1l4.7-2.3M4.7 7.9l4.7 2.3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+          </svg>
+          Deel met vrienden
+        </>
+      )}
+    </button>
+  );
+}
+
 export default function EmailDropCard({ photos, onSent, slug, accentColor = '#1E8BFF', eventName, logoUrl }: Props) {
   const router = useRouter();
   const [email,    setEmail]    = useState('');
@@ -249,21 +300,28 @@ export default function EmailDropCard({ photos, onSent, slug, accentColor = '#1E
               </p>
             </motion.div>
 
-            <motion.button
-              onClick={() => router.push(slug ? `/${slug}` : '/')}
+            <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
-              className="mt-6 flex items-center justify-center gap-1.5 mx-auto px-5 py-2.5 rounded-full text-xs font-bold transition-all hover:opacity-80"
-              style={{
-                background: 'rgba(255,255,255,0.07)',
-                border:     '1px solid rgba(255,255,255,0.12)',
-                color:      'rgba(255,255,255,0.6)',
-              }}
+              className="mt-6 flex flex-col gap-2 items-center w-full"
             >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M8 2L4 6l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Nieuwe drop maken
-            </motion.button>
+              {/* Share button — uses Web Share API if available */}
+              <ShareButton accentColor={accentColor} />
+
+              <button
+                onClick={() => router.push(slug ? `/${slug}` : '/')}
+                className="flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-full text-xs font-bold transition-all hover:opacity-80"
+                style={{
+                  background: 'rgba(255,255,255,0.07)',
+                  border:     '1px solid rgba(255,255,255,0.12)',
+                  color:      'rgba(255,255,255,0.6)',
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M8 2L4 6l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Nieuwe drop maken
+              </button>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

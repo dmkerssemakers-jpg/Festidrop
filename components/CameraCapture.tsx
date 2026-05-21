@@ -110,13 +110,14 @@ export default function CameraCapture({
     img.src = logoUrl;
   }, [logoUrl]);
 
-  const [count,        setCount]        = useState(0);
-  const [flashing,     setFlashing]     = useState(false);
-  const [countdown,    setCountdown]    = useState<number | null>(null);
-  const [permission,   setPermission]   = useState<'idle' | 'requesting' | 'granted' | 'denied'>('idle');
-  const [deniedReason, setDeniedReason] = useState<'blocked' | 'unavailable'>('blocked');
-  const [facingMode,   setFacingMode]   = useState<'environment' | 'user'>('environment');
-  const [switching,    setSwitching]    = useState(false);
+  const [count,          setCount]          = useState(0);
+  const [flashing,       setFlashing]       = useState(false);
+  const [countdown,      setCountdown]      = useState<number | null>(null);
+  const [permission,     setPermission]     = useState<'idle' | 'requesting' | 'granted' | 'denied'>('idle');
+  const [deniedReason,   setDeniedReason]   = useState<'blocked' | 'unavailable'>('blocked');
+  const [facingMode,     setFacingMode]     = useState<'environment' | 'user'>('environment');
+  const [switching,      setSwitching]      = useState(false);
+  const [countdownSecs,  setCountdownSecs]  = useState<0 | 2 | 5>(2);
 
   const remaining  = maxPhotos - count;
   const isComplete = count >= maxPhotos;
@@ -172,6 +173,22 @@ export default function CameraCapture({
   }, [permission, switching, flashing, facingMode, startCamera]);
 
   useEffect(() => () => { streamRef.current?.getTracks().forEach(t => t.stop()); }, []);
+
+  // ── Auto-start camera on mount ───────────────────────────────────
+  const hasAutoStarted = useRef(false);
+  useEffect(() => {
+    if (!hasAutoStarted.current) {
+      hasAutoStarted.current = true;
+      startCamera();
+    }
+  }, [startCamera]);
+
+  // ── Delete last photo (undo) ─────────────────────────────────────
+  const deleteLastPhoto = useCallback(() => {
+    if (photosRef.current.length === 0) return;
+    photosRef.current = photosRef.current.slice(0, -1);
+    setCount(photosRef.current.length);
+  }, []);
 
   // ── Capture photo ────────────────────────────────────────────────
   const shoot = useCallback(() => {
@@ -274,8 +291,12 @@ export default function CameraCapture({
 
   const handleShutterPress = useCallback(() => {
     if (isComplete || flashing || permission !== 'granted' || countdown !== null) return;
-    setCountdown(2);
-  }, [isComplete, flashing, permission, countdown]);
+    if (countdownSecs === 0) {
+      shoot();
+    } else {
+      setCountdown(countdownSecs);
+    }
+  }, [isComplete, flashing, permission, countdown, countdownSecs, shoot]);
 
   const statusText =
     count === 0       ? 'Richt de camera en druk op de knop 📸'
@@ -589,14 +610,46 @@ export default function CameraCapture({
                 </p>
               </motion.div>
             ) : (
-              <motion.p
-                key="status"
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                className="text-center text-xs mt-4 font-medium"
-                style={{ color: 'rgba(255,255,255,0.35)' }}
-              >
-                {statusText}
-              </motion.p>
+              <motion.div key="controls" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                className="mt-4 flex items-center justify-between gap-3">
+
+                {/* Undo last photo */}
+                <AnimatePresence>
+                  {count > 0 ? (
+                    <motion.button
+                      initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      onClick={deleteLastPhoto}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all active:scale-95"
+                      style={{ background: 'rgba(255,80,80,0.12)', border: '1px solid rgba(255,80,80,0.2)', color: 'rgba(255,140,140,0.9)' }}
+                    >
+                      <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                        <path d="M2 3h7M4 3V2h3v1M4.5 5v3M6.5 5v3M2.5 3l.5 6h5l.5-6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      Verwijder
+                    </motion.button>
+                  ) : (
+                    <div />
+                  )}
+                </AnimatePresence>
+
+                {/* Countdown selector */}
+                <div className="flex items-center gap-1">
+                  {([0, 2, 5] as const).map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setCountdownSecs(s)}
+                      className="px-2.5 py-1 rounded-full text-[10px] font-black transition-all"
+                      style={countdownSecs === s
+                        ? { background: `${accentColor}30`, color: accentColor, border: `1px solid ${accentColor}50` }
+                        : { background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.28)', border: '1px solid transparent' }
+                      }
+                    >
+                      {s === 0 ? '⚡' : `${s}s`}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
             )}
           </AnimatePresence>
         </div>

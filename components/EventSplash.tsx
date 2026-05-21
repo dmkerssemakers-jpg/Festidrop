@@ -75,11 +75,8 @@ export default function EventSplash({ slug, accentColor, eventName, logoUrl }: P
             className="relative z-10 flex flex-col items-center gap-5 px-8"
             initial={{ scale: 0.78, opacity: 0, y: 16 }}
             animate={{ scale: 1,    opacity: 1, y: 0  }}
-            exit={{ scale: 1.06, opacity: 0 }}
-            transition={{
-              enter: { duration: 0.55, delay: 0.05, ease: [0.22, 1, 0.36, 1] },
-              exit:  { duration: 0.45, ease: [0.4, 0, 0.2, 1] },
-            }}
+            exit={{ scale: 1.06, opacity: 0, transition: { duration: 0.45, ease: [0.4, 0, 0.2, 1] } }}
+            transition={{ duration: 0.55, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
           >
             {logoUrl ? (
               /* ── Logo in frosted white card ── */
