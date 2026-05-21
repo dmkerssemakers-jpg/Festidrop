@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Caveat } from 'next/font/google';
 import './globals.css';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const inter   = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const caveat  = Caveat({ subsets: ['latin'], variable: '--font-caveat', weight: ['400', '600', '700'] });
 
 export const metadata: Metadata = {
   title: 'FestiDrop — Vang de sfeer. Deel de herinnering.',
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="nl" className={inter.variable}>
+    <html lang="nl" className={`${inter.variable} ${caveat.variable}`}>
       <body>{children}</body>
     </html>
   );

@@ -118,6 +118,10 @@ export default function CameraCapture({
   const [facingMode,     setFacingMode]     = useState<'environment' | 'user'>('environment');
   const [switching,      setSwitching]      = useState(false);
   const [countdownSecs,  setCountdownSecs]  = useState<0 | 2 | 5>(2);
+  // Memory note modal
+  const [pendingPhoto,   setPendingPhoto]   = useState<string | null>(null);
+  const [noteText,       setNoteText]       = useState('');
+  const pendingIsLastRef = useRef(false);
 
   const remaining  = maxPhotos - count;
   const isComplete = count >= maxPhotos;
@@ -248,38 +252,128 @@ export default function CameraCapture({
       ctx.restore();
     }
 
-    // ── White label area ─────────────────────────────────────────────
-    const labelMidY = pad + img + POLAROID_BTM / 2;
-    if (logoImg) {
-      const maxW = 200, maxH = 60;
-      const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight, 1);
-      const lw = logoImg.naturalWidth * ratio;
-      const lh = logoImg.naturalHeight * ratio;
-      ctx.drawImage(logoImg, W / 2 - lw / 2, labelMidY - lh / 2, lw, lh);
-    } else {
-      const label = eventName ?? 'FestiDrop';
-      ctx.fillStyle = '#8A94A6';
-      ctx.font = '700 15px Inter, ui-sans-serif, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(label, W / 2, labelMidY + 6);
-    }
+    // ── Red Kodak-style date/time stamp ──────────────────────────────
+    const now = new Date();
+    const dd  = String(now.getDate()).padStart(2, '0');
+    const mm  = String(now.getMonth() + 1).padStart(2, '0');
+    const yy  = String(now.getFullYear()).slice(2);
+    const hh  = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    const dateStamp = `${dd} ${mm} '${yy}`;
+    const timeStamp = `${hh}:${min}`;
 
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+    ctx.save();
+    ctx.textAlign = 'right';
+    ctx.font = 'bold 17px "Courier New", monospace';
+    // Subtle glow to give it an embedded-in-film look
+    ctx.shadowColor = 'rgba(180,0,0,0.7)';
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = '#E8192C';
+    ctx.fillText(dateStamp, pad + img - 10, pad + img - 22);
+    ctx.fillText(timeStamp, pad + img - 10, pad + img - 5);
+    ctx.restore();
+
+    // ── Save interim (no label yet — added after note modal) ─────────
+    const interimDataUrl = canvas.toDataURL('image/jpeg', 0.92);
 
     setTimeout(() => {
       setFlashing(false);
-      photosRef.current = [...photosRef.current, dataUrl];
-      const nextCount = photosRef.current.length;
-      setCount(nextCount);
-
-      if (nextCount === maxPhotos) {
-        streamRef.current?.getTracks().forEach(t => t.stop());
-        streamRef.current = null;
-        const allPhotos = photosRef.current.slice();
-        setTimeout(() => onCompleteRef.current(allPhotos), 350);
-      }
+      pendingIsLastRef.current = (photosRef.current.length + 1) >= maxPhotos;
+      setPendingPhoto(interimDataUrl);
     }, 160);
-  }, [isComplete, flashing, permission, maxPhotos, eventName]);
+  }, [isComplete, flashing, permission, maxPhotos]);
+
+  // ── Finalize polaroid (after note modal) ─────────────────────────
+  const finalizePolaroid = useCallback(async (note: string) => {
+    const interim = pendingPhoto;
+    if (!interim) return;
+    setPendingPhoto(null);
+    setNoteText('');
+
+    // Ensure Caveat is loaded for canvas use
+    try { await document.fonts.load('700 24px Caveat'); } catch { /* use fallback */ }
+
+    const canvas = canvasRef.current!;
+    const ctx    = canvas.getContext('2d')!;
+    const W      = FRAME_SIZE;
+
+    // Load interim image back onto canvas
+    await new Promise<void>(resolve => {
+      const img = new Image();
+      img.onload = () => { ctx.drawImage(img, 0, 0); resolve(); };
+      img.src = interim;
+    });
+
+    // Clear white label area and redraw with note + branding
+    ctx.fillStyle = '#FEFDF8';
+    ctx.fillRect(0, FRAME_SIZE, W, POLAROID_BTM);
+
+    const noteClean = note.trim();
+    if (noteClean) {
+      // Memory text in handwriting font
+      const fontSize = noteClean.length > 22 ? 24 : 28;
+      ctx.font       = `700 ${fontSize}px Caveat, var(--font-caveat), cursive`;
+      ctx.fillStyle  = '#3D2B1F';
+      ctx.textAlign  = 'center';
+      ctx.fillText(noteClean, W / 2, FRAME_SIZE + 62, W - 60);
+
+      // Small heart decoration
+      ctx.font      = `500 16px Caveat, cursive`;
+      ctx.fillStyle = '#C0392B';
+      ctx.fillText('♥', W / 2, FRAME_SIZE + 86);
+
+      // Thin divider line
+      ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+      ctx.lineWidth   = 1;
+      ctx.beginPath();
+      ctx.moveTo(W / 2 - 80, FRAME_SIZE + 100);
+      ctx.lineTo(W / 2 + 80, FRAME_SIZE + 100);
+      ctx.stroke();
+
+      // Event name / logo below divider
+      const logoImg = logoImgRef.current;
+      if (logoImg) {
+        const maxW = 140, maxH = 34;
+        const r = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight, 1);
+        const lw = logoImg.naturalWidth * r, lh = logoImg.naturalHeight * r;
+        ctx.globalAlpha = 0.55;
+        ctx.drawImage(logoImg, W / 2 - lw / 2, FRAME_SIZE + 110, lw, lh);
+        ctx.globalAlpha = 1;
+      } else {
+        ctx.font      = '600 11px Inter, ui-sans-serif, sans-serif';
+        ctx.fillStyle = '#A0AABB';
+        ctx.textAlign = 'center';
+        ctx.fillText(eventName ?? 'FestiDrop', W / 2, FRAME_SIZE + 130);
+      }
+    } else {
+      // No note — original label behaviour
+      const logoImg   = logoImgRef.current;
+      const labelMidY = FRAME_SIZE + POLAROID_BTM / 2;
+      if (logoImg) {
+        const maxW = 200, maxH = 60;
+        const r  = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight, 1);
+        const lw = logoImg.naturalWidth * r, lh = logoImg.naturalHeight * r;
+        ctx.drawImage(logoImg, W / 2 - lw / 2, labelMidY - lh / 2, lw, lh);
+      } else {
+        ctx.font      = '700 15px Inter, ui-sans-serif, sans-serif';
+        ctx.fillStyle = '#8A94A6';
+        ctx.textAlign = 'center';
+        ctx.fillText(eventName ?? 'FestiDrop', W / 2, labelMidY + 6);
+      }
+    }
+
+    const finalDataUrl = canvas.toDataURL('image/jpeg', 0.88);
+    photosRef.current = [...photosRef.current, finalDataUrl];
+    const nextCount = photosRef.current.length;
+    setCount(nextCount);
+
+    if (pendingIsLastRef.current) {
+      streamRef.current?.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+      const allPhotos = photosRef.current.slice();
+      setTimeout(() => onCompleteRef.current(allPhotos), 350);
+    }
+  }, [pendingPhoto, eventName]);
 
   // ── Countdown ────────────────────────────────────────────────────
   useEffect(() => {
@@ -290,13 +384,13 @@ export default function CameraCapture({
   }, [countdown, shoot]);
 
   const handleShutterPress = useCallback(() => {
-    if (isComplete || flashing || permission !== 'granted' || countdown !== null) return;
+    if (isComplete || flashing || permission !== 'granted' || countdown !== null || pendingPhoto !== null) return;
     if (countdownSecs === 0) {
       shoot();
     } else {
       setCountdown(countdownSecs);
     }
-  }, [isComplete, flashing, permission, countdown, countdownSecs, shoot]);
+  }, [isComplete, flashing, permission, countdown, countdownSecs, pendingPhoto, shoot]);
 
   const statusText =
     count === 0       ? 'Richt de camera en druk op de knop 📸'
@@ -562,8 +656,8 @@ export default function CameraCapture({
 
           <motion.button
             onClick={handleShutterPress}
-            whileTap={(isComplete || permission !== 'granted' || countdown !== null) ? {} : { scale: 0.86 }}
-            disabled={isComplete || permission !== 'granted' || countdown !== null}
+            whileTap={(isComplete || permission !== 'granted' || countdown !== null || pendingPhoto !== null) ? {} : { scale: 0.86 }}
+            disabled={isComplete || permission !== 'granted' || countdown !== null || pendingPhoto !== null}
             aria-label="Maak foto"
             className="w-[80px] h-[80px] rounded-full flex items-center justify-center focus:outline-none disabled:opacity-35 disabled:cursor-not-allowed"
             style={{
@@ -656,6 +750,136 @@ export default function CameraCapture({
 
         <canvas ref={canvasRef} className="hidden" aria-hidden />
       </motion.div>
+
+      {/* ── Memory note modal ─────────────────────────────────────── */}
+      <AnimatePresence>
+        {pendingPhoto && (
+          <motion.div
+            key="note-modal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[150] flex items-end justify-center"
+            style={{ background: 'rgba(7,22,47,0.70)', backdropFilter: 'blur(8px)' }}
+          >
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', stiffness: 340, damping: 34 }}
+              className="w-full max-w-md rounded-t-[32px] overflow-hidden"
+              style={{
+                background:   'rgba(14,26,52,0.97)',
+                border:       `1px solid ${accentColor}25`,
+                borderBottom: 'none',
+                boxShadow:    `0 -24px 60px rgba(7,22,47,0.5), 0 0 40px ${accentColor}18`,
+              }}
+            >
+              {/* Top accent line */}
+              <div className="h-px w-full"
+                style={{ background: `linear-gradient(90deg, transparent, ${accentColor}60, transparent)` }} />
+
+              {/* Handle bar */}
+              <div className="flex justify-center pt-3 pb-1">
+                <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
+              </div>
+
+              <div className="px-6 pb-8 pt-2">
+                {/* Header with thumbnail */}
+                <div className="flex items-center gap-4 mb-5">
+                  {/* Photo thumbnail */}
+                  <div className="rounded-xl overflow-hidden shrink-0"
+                    style={{ width: 52, height: 64, background: '#FEFDF8', boxShadow: '0 4px 16px rgba(7,22,47,0.4)' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={pendingPhoto} alt="" className="w-full object-cover"
+                      style={{ height: 'calc(100% - 11px)' }} />
+                    <div className="h-[11px] bg-[#FEFDF8]" />
+                  </div>
+                  <div>
+                    <p className="text-white font-black text-base" style={{ letterSpacing: '-0.02em' }}>
+                      Voeg een herinnering toe
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>
+                      Verschijnt op je polaroid
+                    </p>
+                  </div>
+                </div>
+
+                {/* Text input with handwriting font preview */}
+                <div className="relative mb-3">
+                  <textarea
+                    value={noteText}
+                    onChange={e => setNoteText(e.target.value.slice(0, 40))}
+                    placeholder="Best night ever ♥"
+                    rows={2}
+                    autoFocus
+                    className="w-full px-4 py-3 rounded-2xl resize-none focus:outline-none transition-all"
+                    style={{
+                      background:  'rgba(255,255,255,0.06)',
+                      border:      `1px solid ${noteText ? accentColor + '50' : 'rgba(255,255,255,0.10)'}`,
+                      color:       '#fff',
+                      fontSize:    '22px',
+                      lineHeight:  1.3,
+                      fontFamily:  'var(--font-caveat), Caveat, cursive',
+                      caretColor:  accentColor,
+                    }}
+                  />
+                  {/* Character counter */}
+                  <span
+                    className="absolute bottom-2.5 right-3 text-[10px] font-bold tabular-nums"
+                    style={{ color: noteText.length > 35 ? '#FF6B35' : 'rgba(255,255,255,0.22)' }}
+                  >
+                    {noteText.length}/40
+                  </span>
+                </div>
+
+                {/* Quick emoji / symbols bar */}
+                <div className="flex gap-2 mb-5 flex-wrap">
+                  {['♥', '✦', '🎵', '🎉', '📸', '⚡', '🌙', '✌️'].map(emoji => (
+                    <button
+                      key={emoji}
+                      onClick={() => setNoteText(t => (t + emoji).slice(0, 40))}
+                      className="w-9 h-9 rounded-xl flex items-center justify-center text-base transition-all hover:scale-110 active:scale-90"
+                      style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => finalizePolaroid('')}
+                    className="flex-1 py-3.5 rounded-full text-sm font-bold transition-all hover:opacity-80"
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border:     '1px solid rgba(255,255,255,0.10)',
+                      color:      'rgba(255,255,255,0.45)',
+                    }}
+                  >
+                    Sla over
+                  </button>
+                  <motion.button
+                    onClick={() => finalizePolaroid(noteText)}
+                    whileTap={{ scale: 0.97 }}
+                    className="flex-[2] py-3.5 rounded-full text-sm font-black text-white transition-all flex items-center justify-center gap-2"
+                    style={{
+                      background: `linear-gradient(135deg, ${accentColor}, ${accentColor}CC)`,
+                      boxShadow:  `0 8px 24px ${accentColor}45`,
+                    }}
+                  >
+                    <span style={{ fontFamily: 'var(--font-caveat), cursive', fontSize: '18px' }}>
+                      {noteText.trim() ? `"${noteText.trim().slice(0, 12)}${noteText.length > 12 ? '…' : ''}"` : 'Bewaar'}
+                    </span>
+                    ♥
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }
