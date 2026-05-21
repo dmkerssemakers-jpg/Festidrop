@@ -29,7 +29,13 @@ export default function EventForm({ event }: Props) {
   const [isActive, setIsActive]     = useState(event.isActive);
   const [saved, setSaved]           = useState(false);
   const [logoUrl, setLogoUrl]       = useState(event.logoUrl ?? '');
+  const [showCode, setShowCode]     = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
+
+  // Format endsAt for datetime-local input (YYYY-MM-DDTHH:mm)
+  const endsAtValue = event.endsAt
+    ? new Date(event.endsAt).toISOString().slice(0, 16)
+    : '';
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -155,6 +161,60 @@ export default function EventForm({ event }: Props) {
                 </button>
               </div>
             </div>
+            {/* Access code */}
+            <div>
+              <div className="flex items-baseline gap-2 mb-1.5">
+                <label className="field-label">Toegangscode</label>
+                <span className="text-[10px] text-muted">optioneel — gasten moeten code invoeren</span>
+              </div>
+              <div className="relative">
+                <input
+                  name="accessCode"
+                  type={showCode ? 'text' : 'password'}
+                  defaultValue={event.accessCode ?? ''}
+                  placeholder="bijv. lowlands2026"
+                  autoComplete="new-password"
+                  className="field pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCode(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-navy transition-colors"
+                  tabIndex={-1}
+                >
+                  {showCode ? (
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <path d="M2 2l12 12M6.5 6.6A2 2 0 0010.4 9.5M4.3 4.4C2.9 5.3 1.8 6.5 1 8c1.5 3 4.1 5 7 5 1.3 0 2.5-.4 3.6-1M7 3.1C7.3 3 7.7 3 8 3c2.9 0 5.5 2 7 5-.5 1-1.2 2-2 2.7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                    </svg>
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <path d="M1 8c1.5-3 4.1-5 7-5s5.5 2 7 5c-1.5 3-4.1 5-7 5S2.5 11 1 8z" stroke="currentColor" strokeWidth="1.3"/>
+                      <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.3"/>
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Auto end date */}
+            <div>
+              <div className="flex items-baseline gap-2 mb-1.5">
+                <label className="field-label">Automatisch eindigen</label>
+                <span className="text-[10px] text-muted">optioneel</span>
+              </div>
+              <input
+                name="endsAt"
+                type="datetime-local"
+                defaultValue={endsAtValue}
+                className="field"
+              />
+              {event.endsAt && new Date(event.endsAt) < new Date() && (
+                <p className="text-[11px] mt-1 font-medium" style={{ color: '#FF6B35' }}>
+                  ⚠ Einddatum is verstreken — event is automatisch gestopt
+                </p>
+              )}
+            </div>
+
           </div>
         </div>
 

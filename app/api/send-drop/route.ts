@@ -45,15 +45,20 @@ export async function POST(req: NextRequest) {
   let event: { id: string; name: string; emailText: string | null; whitelist: { email: string }[] } | null = null;
   if (slug) {
     try {
-      event = await prisma.event.findUnique({
+      const candidate = await prisma.event.findUnique({
         where: { slug, isActive: true },
         select: {
           id: true,
           name: true,
           emailText: true,
+          endsAt: true,
           whitelist: { select: { email: true } },
         },
       });
+      // Respect auto end date
+      if (candidate && (!candidate.endsAt || new Date(candidate.endsAt) >= new Date())) {
+        event = candidate;
+      }
     } catch {
       console.warn('[send-drop] Prisma lookup mislukt, doorgaan zonder event');
     }

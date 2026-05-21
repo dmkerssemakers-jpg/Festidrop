@@ -199,8 +199,40 @@ export default function CameraCapture({
 
     applyPolaroidFilter(ctx, pad, pad, img, img);
 
+    // ── Watermark: subtle logo overlaid on the photo corner ─────────
+    const logoImg = logoImgRef.current;
+    if (logoImg) {
+      const wmMaxW = 140, wmMaxH = 42;
+      const ratio = Math.min(wmMaxW / logoImg.naturalWidth, wmMaxH / logoImg.naturalHeight, 1);
+      const wmW = logoImg.naturalWidth * ratio;
+      const wmH = logoImg.naturalHeight * ratio;
+      const margin = 14;
+      // Subtle dark pill backdrop
+      ctx.save();
+      ctx.globalAlpha = 0.38;
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      const rx = pad + img - wmW - margin - 8;
+      const ry = pad + img - wmH - margin - 6;
+      const rw = wmW + 16, rh = wmH + 12, r = 8;
+      ctx.beginPath();
+      ctx.moveTo(rx + r, ry);
+      ctx.lineTo(rx + rw - r, ry);
+      ctx.quadraticCurveTo(rx + rw, ry, rx + rw, ry + r);
+      ctx.lineTo(rx + rw, ry + rh - r);
+      ctx.quadraticCurveTo(rx + rw, ry + rh, rx + rw - r, ry + rh);
+      ctx.lineTo(rx + r, ry + rh);
+      ctx.quadraticCurveTo(rx, ry + rh, rx, ry + rh - r);
+      ctx.lineTo(rx, ry + r);
+      ctx.quadraticCurveTo(rx, ry, rx + r, ry);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 0.72;
+      ctx.drawImage(logoImg, pad + img - wmW - margin, pad + img - wmH - margin, wmW, wmH);
+      ctx.restore();
+    }
+
+    // ── White label area ─────────────────────────────────────────────
     const labelMidY = pad + img + POLAROID_BTM / 2;
-    const logoImg   = logoImgRef.current;
     if (logoImg) {
       const maxW = 200, maxH = 60;
       const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight, 1);

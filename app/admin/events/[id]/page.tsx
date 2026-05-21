@@ -5,6 +5,7 @@ import EventForm from '@/components/admin/EventForm';
 import EventStats from '@/components/admin/EventStats';
 import WhitelistManager from '@/components/admin/WhitelistManager';
 import QrCodeCard from '@/components/admin/QrCodeCard';
+import DuplicateEventButton from '@/components/admin/DuplicateEventButton';
 
 export default async function EditEventPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -91,6 +92,23 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
 
           {/* Quick actions */}
           <div className="flex items-center gap-2 shrink-0">
+            {/* Export CSV */}
+            <a
+              href={`/api/admin/events/${event.id}/export-drops`}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-navy transition-all hover:scale-105"
+              style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(189,239,255,0.5)' }}
+              title="Download drops als CSV"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M6 1v7M3 5l3 3 3-3M1 10h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Export CSV
+            </a>
+
+            {/* Duplicate */}
+            <DuplicateEventButton eventId={event.id} />
+
+            {/* Open event */}
             <a
               href={eventUrl}
               target="_blank"

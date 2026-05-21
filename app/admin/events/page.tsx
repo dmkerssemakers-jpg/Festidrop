@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import type { Event } from '@prisma/client';
 import Link from 'next/link';
 import CopyLinkButton from '@/components/admin/CopyLinkButton';
+import DuplicateEventButton from '@/components/admin/DuplicateEventButton';
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://festidrop.vercel.app';
 
@@ -144,6 +145,7 @@ export default async function EventsPage() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 shrink-0">
+                  <DuplicateEventButton eventId={event.id} />
                   <CopyLinkButton url={url} />
 
                   <a

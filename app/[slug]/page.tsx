@@ -4,17 +4,51 @@ import BackgroundPattern from '@/components/BackgroundPattern';
 import Header from '@/components/Header';
 import EventPhotoSession from '@/components/EventPhotoSession';
 import EventSplash from '@/components/EventSplash';
+import AccessGate from '@/components/AccessGate';
 
 export default async function EventPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
   const event = await prisma.event.findUnique({
-    where: { slug, isActive: true },
+    where: { slug },
   });
 
-  if (!event) notFound();
+  if (!event || !event.isActive) notFound();
 
-  return (
+  // Auto-deactivate: if endsAt has passed, treat as ended
+  if (event.endsAt && new Date(event.endsAt) < new Date()) {
+    return (
+      <main className="min-h-screen flex items-center justify-center px-5" style={{ backgroundColor: '#F7FBFF' }}>
+        <BackgroundPattern accentColor={event.accentColor} />
+        <div
+          className="relative rounded-[28px] p-10 text-center max-w-sm w-full"
+          style={{
+            background: 'rgba(255,255,255,0.9)',
+            border:     `1px solid ${event.accentColor}30`,
+            boxShadow:  '0 24px 80px rgba(7,22,47,0.08)',
+          }}
+        >
+          <div
+            className="w-14 h-14 rounded-2xl mx-auto mb-5 flex items-center justify-center"
+            style={{ background: `${event.accentColor}15` }}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="9" stroke={event.accentColor} strokeWidth="1.6"/>
+              <path d="M12 7v5l3 3" stroke={event.accentColor} strokeWidth="1.6" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <h1 className="text-xl font-black mb-2" style={{ color: '#07162F', letterSpacing: '-0.03em' }}>
+            {event.name}
+          </h1>
+          <p className="text-sm" style={{ color: '#6C7A8D' }}>
+            Dit event is afgelopen. Tot de volgende editie! 🎉
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  const content = (
     <main className="min-h-screen relative" style={{ backgroundColor: '#F7FBFF' }}>
       {/* Subtle page tint in event accent */}
       <div
@@ -45,4 +79,20 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
       />
     </main>
   );
+
+  // If access code is set, wrap in the gate
+  if (event.accessCode) {
+    return (
+      <AccessGate
+        slug={slug}
+        accessCode={event.accessCode}
+        accentColor={event.accentColor}
+        eventName={event.name}
+      >
+        {content}
+      </AccessGate>
+    );
+  }
+
+  return content;
 }
