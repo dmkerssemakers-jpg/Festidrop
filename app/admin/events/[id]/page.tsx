@@ -112,7 +112,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
             <span className="font-bold text-navy">{drops.length}</span> drops
           </span>
           <span className="text-xs text-muted">
-            <span className="font-bold text-navy">{new Set(drops.map(d => d.email)).size}</span> unieke e-mails
+            <span className="font-bold text-navy">{new Set(drops.map((d: { email: string }) => d.email)).size}</span> unieke e-mails
           </span>
           <span className="text-xs text-muted">
             Max <span className="font-bold text-navy">{event.maxPhotos}</span> foto's per sessie
