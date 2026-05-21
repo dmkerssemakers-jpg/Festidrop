@@ -11,6 +11,7 @@
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",
     "@prisma/client": "^5.22.0",
+    "@prisma/extension-accelerate": "^3.0.1",
     "@vercel/blob": "^2.4.0",
     "@vercel/kv": "^3.0.0",
     "framer-motion": "^11.0.0",

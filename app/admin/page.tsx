@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import type { Event, Drop } from '@prisma/client';
 import Link from 'next/link';
 
 export default async function AdminDashboard() {
@@ -46,7 +47,7 @@ export default async function AdminDashboard() {
           <EmptyState />
         ) : (
           <div className="grid gap-3">
-            {activeEvents.map((event) => (
+            {activeEvents.map((event: Event & { _count: { drops: number } }) => (
               <Link
                 key={event.id}
                 href={`/admin/events/${event.id}`}
@@ -88,7 +89,7 @@ export default async function AdminDashboard() {
               border: '1px solid rgba(189,239,255,0.55)',
             }}
           >
-            {recentDrops.map((drop, i) => (
+            {recentDrops.map((drop: Drop & { event: { name: string } }, i: number) => (
               <div
                 key={drop.id}
                 className="flex items-center justify-between px-5 py-3"

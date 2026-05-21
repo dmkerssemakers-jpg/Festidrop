@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import type { Event } from '@prisma/client';
 import Link from 'next/link';
 
 export default async function EventsPage() {
@@ -43,7 +44,7 @@ export default async function EventsPage() {
         </div>
       ) : (
         <div className="grid gap-3">
-          {events.map((event) => (
+          {events.map((event: Event & { _count: { drops: number } }) => (
             <div
               key={event.id}
               className="flex items-center gap-4 rounded-2xl px-5 py-4"
