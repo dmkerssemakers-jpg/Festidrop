@@ -1,35 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { kv } from '@vercel/kv';
+import { prisma } from '@/lib/prisma';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = process.env.RESEND_FROM ?? 'FestiDrop <onboarding@resend.dev>';
 
-// Whitelisted e-mails die de limiet omzeilen (komma-gescheiden in env var)
-const TEST_EMAILS = (process.env.TEST_EMAILS ?? '')
+// Whitelisted e-mails die de limiet omzeilen (globaal, voor het default-event)
+const GLOBAL_TEST_EMAILS = (process.env.TEST_EMAILS ?? '')
   .split(',')
   .map(e => e.trim().toLowerCase())
   .filter(Boolean);
 
 export async function POST(req: NextRequest) {
-  const { email, photos } = (await req.json()) as {
+  const { email, photos, slug } = (await req.json()) as {
     email: string;
-    photos: string[]; // base64 data-URLs: "data:image/jpeg;base64,..."
+    photos: string[];
+    slug?: string;
   };
 
   if (!email || !Array.isArray(photos) || photos.length === 0) {
-    return NextResponse.json(
-      { error: 'email en foto\'s zijn verplicht' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "email en foto's zijn verplicht" }, { status: 400 });
   }
 
   const normalizedEmail = email.trim().toLowerCase();
-  const isTestEmail = TEST_EMAILS.includes(normalizedEmail);
-  const kvKey = `drop:${normalizedEmail}`;
 
-  // ── Rate-limit check (alleen als KV geconfigureerd is) ───────────
-  if (!isTestEmail) {
+  // ── Load event (if slug provided) ───────────────────────────────
+  let event: { id: string; name: string; emailText: string | null; whitelist: { email: string }[] } | null = null;
+  if (slug) {
+    try {
+      event = await prisma.event.findUnique({
+        where: { slug, isActive: true },
+        select: {
+          id: true,
+          name: true,
+          emailText: true,
+          whitelist: { select: { email: true } },
+        },
+      });
+    } catch {
+      console.warn('[send-drop] Prisma lookup mislukt, doorgaan zonder event');
+    }
+  }
+
+  // ── Whitelist check ──────────────────────────────────────────────
+  const eventWhitelist = event?.whitelist.map(w => w.email) ?? [];
+  const isWhitelisted =
+    GLOBAL_TEST_EMAILS.includes(normalizedEmail) ||
+    eventWhitelist.includes(normalizedEmail);
+
+  // ── Rate-limit check (KV, alleen niet-whitelisted) ───────────────
+  const kvKey = `drop:${event?.id ?? 'default'}:${normalizedEmail}`;
+
+  if (!isWhitelisted) {
     try {
       const alreadyUsed = await kv.get(kvKey);
       if (alreadyUsed) {
@@ -39,12 +62,16 @@ export async function POST(req: NextRequest) {
         );
       }
     } catch {
-      // KV niet geconfigureerd of niet bereikbaar — sla limiet over
       console.warn('[send-drop] KV niet beschikbaar, rate-limit overgeslagen');
     }
   }
 
-  // Strip data-URL header → raw base64
+  // ── Build e-mail ─────────────────────────────────────────────────
+  const eventName = event?.name ?? 'FestiDrop';
+  const customText = event?.emailText
+    ? `<p style="margin:12px 0 0;color:#6C7A8D;font-size:14px;line-height:1.6;">${event.emailText}</p>`
+    : '';
+
   const attachments = photos.map((dataUrl, i) => ({
     filename: `festidrop-${String(i + 1).padStart(2, '0')}.jpg`,
     content: dataUrl.replace(/^data:image\/\w+;base64,/, ''),
@@ -60,10 +87,10 @@ export async function POST(req: NextRequest) {
     <tr><td align="center">
       <table width="100%" style="max-width:560px;">
 
-        <!-- Logo + header -->
+        <!-- Header -->
         <tr><td align="center" style="padding-bottom:28px;">
           <p style="margin:0 0 6px;font-size:13px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#6C7A8D;">
-            ● Festival photo experience
+            ● ${eventName}
           </p>
           <h1 style="margin:0;font-size:32px;font-weight:900;color:#07162F;letter-spacing:-0.04em;line-height:1.05;">
             Jouw FestiDrop<br>
@@ -75,6 +102,7 @@ export async function POST(req: NextRequest) {
             Je ${photos.length}&nbsp;polaroid-foto's zitten als bijlage bij deze mail.<br>
             Vang de sfeer. Deel de herinnering.
           </p>
+          ${customText}
         </td></tr>
 
         <!-- Card -->
@@ -104,7 +132,6 @@ export async function POST(req: NextRequest) {
 </body>
 </html>`;
 
-  // Guard: API key must be present
   if (!process.env.RESEND_API_KEY) {
     console.error('[send-drop] RESEND_API_KEY is not set');
     return NextResponse.json({ error: 'Server configuratiefout (geen API key).' }, { status: 500 });
@@ -124,16 +151,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Resend: ${error.message}` }, { status: 500 });
     }
 
-    // ── Registreer gebruik in KV (24 uur geldig) ─────────────────
-    if (!isTestEmail) {
+    // ── Log drop in DB ───────────────────────────────────────────────
+    if (event?.id) {
       try {
-        await kv.set(kvKey, 1, { ex: 86400 });
+        await prisma.drop.create({
+          data: { eventId: event.id, email: normalizedEmail },
+        });
       } catch {
-        console.warn('[send-drop] KV write mislukt, gebruik niet opgeslagen');
+        console.warn('[send-drop] Drop logging mislukt');
       }
     }
 
-    console.log('[send-drop] Sent OK, id:', data?.id, isTestEmail ? '(test email, geen limiet)' : '');
+    // ── Registreer in KV (24 uur) ────────────────────────────────────
+    if (!isWhitelisted) {
+      try {
+        await kv.set(kvKey, 1, { ex: 86400 });
+      } catch {
+        console.warn('[send-drop] KV write mislukt');
+      }
+    }
+
+    console.log('[send-drop] Sent OK, id:', data?.id, isWhitelisted ? '(whitelisted, geen limiet)' : '');
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error('[send-drop] Unexpected error:', err);

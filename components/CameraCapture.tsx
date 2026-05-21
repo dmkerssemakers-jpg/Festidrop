@@ -84,9 +84,13 @@ function applyPolaroidFilter(
   ctx.fillRect(px, py, pw, ph);
 }
 
-type Props = { onComplete: (photos: string[]) => void };
+type Props = {
+  onComplete: (photos: string[]) => void;
+  maxPhotos?: number;
+  eventId?: string;
+};
 
-export default function CameraCapture({ onComplete }: Props) {
+export default function CameraCapture({ onComplete, maxPhotos = MAX }: Props) {
   const videoRef   = useRef<HTMLVideoElement>(null);
   const canvasRef  = useRef<HTMLCanvasElement>(null);
   const streamRef  = useRef<MediaStream | null>(null);
@@ -100,8 +104,8 @@ export default function CameraCapture({ onComplete }: Props) {
   const [permission,   setPermission]   = useState<'idle' | 'requesting' | 'granted' | 'denied'>('idle');
   const [deniedReason, setDeniedReason] = useState<'blocked' | 'unavailable'>('blocked');
 
-  const remaining  = MAX - count;
-  const isComplete = count >= MAX;
+  const remaining  = maxPhotos - count;
+  const isComplete = count >= maxPhotos;
 
   // ── Start camera ────────────────────────────────────────────────
   const startCamera = useCallback(async () => {
@@ -173,7 +177,7 @@ export default function CameraCapture({ onComplete }: Props) {
       setCount(nextCount);
 
       // Call onComplete outside of any setState callback
-      if (nextCount === MAX) {
+      if (nextCount === maxPhotos) {
         // Stop camera stream zodra sessie klaar is
         streamRef.current?.getTracks().forEach(t => t.stop());
         streamRef.current = null;
@@ -181,7 +185,7 @@ export default function CameraCapture({ onComplete }: Props) {
         setTimeout(() => onCompleteRef.current(allPhotos), 350);
       }
     }, 160);
-  }, [isComplete, flashing, permission]);
+  }, [isComplete, flashing, permission, maxPhotos]);
 
   // ── Countdown → fires shoot when it hits 0 ───────────────────────
   useEffect(() => {
@@ -235,7 +239,7 @@ export default function CameraCapture({ onComplete }: Props) {
               FestiDrop Camera
             </span>
           </div>
-          <span className="text-xs font-bold text-muted">{count}/{MAX}</span>
+          <span className="text-xs font-bold text-muted">{count}/{maxPhotos}</span>
         </div>
 
         {/* Viewfinder */}
@@ -357,7 +361,7 @@ export default function CameraCapture({ onComplete }: Props) {
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.1em] text-muted mb-0.5">Foto's</p>
             <p className="text-[28px] font-black leading-none tracking-[-0.04em] text-navy">
-              {count}<span className="text-sm font-bold text-muted">/10</span>
+              {count}<span className="text-sm font-bold text-muted">/{maxPhotos}</span>
             </p>
           </div>
 

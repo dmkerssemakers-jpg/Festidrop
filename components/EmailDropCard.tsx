@@ -4,11 +4,11 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FestiDropIcon } from './Logo';
 
-type Props = { photos: string[]; onSent?: () => void };
+type Props = { photos: string[]; onSent?: () => void; slug?: string };
 
 type State = 'idle' | 'sending' | 'sent' | 'error';
 
-export default function EmailDropCard({ photos, onSent }: Props) {
+export default function EmailDropCard({ photos, onSent, slug }: Props) {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [state, setState] = useState<State>('idle');
@@ -24,7 +24,7 @@ export default function EmailDropCard({ photos, onSent }: Props) {
       const res = await fetch('/api/send-drop', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, photos }),
+        body: JSON.stringify({ email, photos, slug }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Onbekende fout');
@@ -118,7 +118,7 @@ export default function EmailDropCard({ photos, onSent }: Props) {
                 Check je inbox — de foto's wachten op je. 📸
               </p>
               <button
-                onClick={() => router.push('/')}
+                onClick={() => router.push(slug ? `/${slug}` : '/')}
                 className="mt-5 text-xs font-bold text-azure hover:underline"
               >
                 ← Nieuwe drop maken
