@@ -220,35 +220,16 @@ export default function CameraCapture({
 
     applyPolaroidFilter(ctx, pad, pad, img, img);
 
-    // ── Watermark: subtle logo overlaid on the photo corner ─────────
-    const logoImg = logoImgRef.current;
-    if (logoImg) {
-      const wmMaxW = 140, wmMaxH = 42;
-      const ratio = Math.min(wmMaxW / logoImg.naturalWidth, wmMaxH / logoImg.naturalHeight, 1);
-      const wmW = logoImg.naturalWidth * ratio;
-      const wmH = logoImg.naturalHeight * ratio;
-      const margin = 14;
-      // Subtle dark pill backdrop
+    // ── Event name text watermark (large transparent text over photo) ──
+    if (eventName) {
       ctx.save();
-      ctx.globalAlpha = 0.38;
-      ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      const rx = pad + img - wmW - margin - 8;
-      const ry = pad + img - wmH - margin - 6;
-      const rw = wmW + 16, rh = wmH + 12, r = 8;
-      ctx.beginPath();
-      ctx.moveTo(rx + r, ry);
-      ctx.lineTo(rx + rw - r, ry);
-      ctx.quadraticCurveTo(rx + rw, ry, rx + rw, ry + r);
-      ctx.lineTo(rx + rw, ry + rh - r);
-      ctx.quadraticCurveTo(rx + rw, ry + rh, rx + rw - r, ry + rh);
-      ctx.lineTo(rx + r, ry + rh);
-      ctx.quadraticCurveTo(rx, ry + rh, rx, ry + rh - r);
-      ctx.lineTo(rx, ry + r);
-      ctx.quadraticCurveTo(rx, ry, rx + r, ry);
-      ctx.closePath();
-      ctx.fill();
-      ctx.globalAlpha = 0.72;
-      ctx.drawImage(logoImg, pad + img - wmW - margin, pad + img - wmH - margin, wmW, wmH);
+      const wm     = eventName.toUpperCase();
+      const wmSize = wm.length > 16 ? 28 : wm.length > 10 ? 34 : 40;
+      ctx.font        = `900 ${wmSize}px Inter, ui-sans-serif, sans-serif`;
+      ctx.textAlign   = 'center';
+      ctx.globalAlpha = 0.20;
+      ctx.fillStyle   = '#FFFFFF';
+      ctx.fillText(wm, W / 2, pad + img - 16, img - 40);
       ctx.restore();
     }
 
@@ -263,14 +244,14 @@ export default function CameraCapture({
     const timeStamp = `${hh}:${min}`;
 
     ctx.save();
-    ctx.textAlign = 'right';
+    ctx.textAlign = 'left';
     ctx.font = 'bold 17px "Courier New", monospace';
     // Subtle glow to give it an embedded-in-film look
     ctx.shadowColor = 'rgba(180,0,0,0.7)';
     ctx.shadowBlur = 6;
     ctx.fillStyle = '#E8192C';
-    ctx.fillText(dateStamp, pad + img - 10, pad + img - 22);
-    ctx.fillText(timeStamp, pad + img - 10, pad + img - 5);
+    ctx.fillText(dateStamp, pad + 10, pad + img - 22);
+    ctx.fillText(timeStamp, pad + 10, pad + img - 5);
     ctx.restore();
 
     // ── Save interim (no label yet — added after note modal) ─────────
@@ -310,55 +291,42 @@ export default function CameraCapture({
 
     const noteClean = note.trim();
     if (noteClean) {
-      // Memory text in handwriting font
-      const fontSize = noteClean.length > 22 ? 24 : 28;
+      // Memory text — large handwriting font, hero of the label area
+      const fontSize = noteClean.length > 26 ? 32 : noteClean.length > 16 ? 38 : 44;
       ctx.font       = `700 ${fontSize}px Caveat, var(--font-caveat), cursive`;
-      ctx.fillStyle  = '#3D2B1F';
+      ctx.fillStyle  = '#2C1810';
       ctx.textAlign  = 'center';
-      ctx.fillText(noteClean, W / 2, FRAME_SIZE + 62, W - 60);
+      ctx.fillText(noteClean, W / 2, FRAME_SIZE + 68, W - 48);
 
-      // Small heart decoration
-      ctx.font      = `500 16px Caveat, cursive`;
+      // Heart accent
+      ctx.font      = `700 20px Caveat, cursive`;
       ctx.fillStyle = '#C0392B';
-      ctx.fillText('♥', W / 2, FRAME_SIZE + 86);
+      ctx.fillText('♥', W / 2, FRAME_SIZE + 98);
 
-      // Thin divider line
-      ctx.strokeStyle = 'rgba(0,0,0,0.06)';
-      ctx.lineWidth   = 1;
-      ctx.beginPath();
-      ctx.moveTo(W / 2 - 80, FRAME_SIZE + 100);
-      ctx.lineTo(W / 2 + 80, FRAME_SIZE + 100);
-      ctx.stroke();
-
-      // Event name / logo below divider
-      const logoImg = logoImgRef.current;
-      if (logoImg) {
-        const maxW = 140, maxH = 34;
-        const r = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight, 1);
-        const lw = logoImg.naturalWidth * r, lh = logoImg.naturalHeight * r;
-        ctx.globalAlpha = 0.55;
-        ctx.drawImage(logoImg, W / 2 - lw / 2, FRAME_SIZE + 110, lw, lh);
-        ctx.globalAlpha = 1;
-      } else {
-        ctx.font      = '600 11px Inter, ui-sans-serif, sans-serif';
-        ctx.fillStyle = '#A0AABB';
-        ctx.textAlign = 'center';
-        ctx.fillText(eventName ?? 'FestiDrop', W / 2, FRAME_SIZE + 130);
-      }
+      // Subtle event name at very bottom — small, not distracting
+      ctx.font      = '500 10px Inter, ui-sans-serif, sans-serif';
+      ctx.fillStyle = 'rgba(0,0,0,0.20)';
+      ctx.textAlign = 'center';
+      ctx.fillText((eventName ?? 'FestiDrop').toUpperCase(), W / 2, FRAME_SIZE + 136);
     } else {
-      // No note — original label behaviour
+      // No note — show logo or event name prominently in center
       const logoImg   = logoImgRef.current;
       const labelMidY = FRAME_SIZE + POLAROID_BTM / 2;
       if (logoImg) {
-        const maxW = 200, maxH = 60;
+        const maxW = 220, maxH = 70;
         const r  = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight, 1);
         const lw = logoImg.naturalWidth * r, lh = logoImg.naturalHeight * r;
         ctx.drawImage(logoImg, W / 2 - lw / 2, labelMidY - lh / 2, lw, lh);
+      } else if (eventName) {
+        ctx.font      = '700 22px Inter, ui-sans-serif, sans-serif';
+        ctx.fillStyle = '#2C1810';
+        ctx.textAlign = 'center';
+        ctx.fillText(eventName, W / 2, labelMidY + 8, W - 60);
       } else {
         ctx.font      = '700 15px Inter, ui-sans-serif, sans-serif';
         ctx.fillStyle = '#8A94A6';
         ctx.textAlign = 'center';
-        ctx.fillText(eventName ?? 'FestiDrop', W / 2, labelMidY + 6);
+        ctx.fillText('FestiDrop', W / 2, labelMidY + 6);
       }
     }
 
