@@ -176,7 +176,8 @@ export default function CameraCapture({
       ctx.textAlign   = 'center';
       ctx.globalAlpha = d.watermarkOpacity / 100;
       ctx.fillStyle   = d.watermarkColor;
-      ctx.fillText(wm, W / 2, pad + img - 16, img - 40);
+      // Center of photo — stays clear of the bottom date stamp
+      ctx.fillText(wm, W / 2, pad + Math.round(img * 0.52), img - 40);
       ctx.restore();
     }
 

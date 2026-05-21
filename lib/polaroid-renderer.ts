@@ -195,7 +195,7 @@ export async function renderPolaroid(
   // ── Film filter ───────────────────────────────────────────────────
   applyPolaroidFilter(ctx, pad, pad, img, img, design.filterStrength);
 
-  // ── Event name watermark ──────────────────────────────────────────
+  // ── Event name watermark (centered on photo, away from date stamp) ──
   if (design.watermark && eventName) {
     ctx.save();
     const wm     = eventName.toUpperCase();
@@ -204,7 +204,8 @@ export async function renderPolaroid(
     ctx.textAlign   = 'center';
     ctx.globalAlpha = design.watermarkOpacity / 100;
     ctx.fillStyle   = design.watermarkColor;
-    ctx.fillText(wm, W / 2, pad + img - 16, img - 40);
+    // Vertical center of the photo — stays clear of the bottom date stamp
+    ctx.fillText(wm, W / 2, pad + Math.round(img * 0.52), img - 40);
     ctx.restore();
   }
 
