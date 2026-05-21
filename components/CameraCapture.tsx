@@ -392,7 +392,7 @@ export default function CameraCapture({
                       Klik op het camera-icoon in de adresbalk en kies <strong className="text-white/60">&ldquo;Toestaan&rdquo;</strong>.
                     </p>
                   </div>
-                  <button onClick={startCamera}
+                  <button onClick={() => startCamera()}
                     className="px-5 py-2.5 rounded-full text-sm font-bold text-white border border-white/15 hover:border-white/30 transition-colors">
                     Probeer opnieuw
                   </button>
