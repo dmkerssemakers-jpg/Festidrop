@@ -134,6 +134,7 @@ export default function CameraCapture({ onComplete }: Props) {
     if (!video || !canvas) return;
 
     setFlashing(true);
+    if (navigator.vibrate) navigator.vibrate(80); // tactiele feedback op mobiel
 
     // Build polaroid frame on canvas
     const W = FRAME_SIZE, H = FRAME_SIZE + POLAROID_BTM;
@@ -178,6 +179,9 @@ export default function CameraCapture({ onComplete }: Props) {
 
       // Call onComplete outside of any setState callback
       if (nextCount === MAX) {
+        // Stop camera stream zodra sessie klaar is
+        streamRef.current?.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
         const allPhotos = photosRef.current.slice();
         setTimeout(() => onCompleteRef.current(allPhotos), 350);
       }
@@ -199,14 +203,14 @@ export default function CameraCapture({ onComplete }: Props) {
   // ── Start countdown on button press ─────────────────────────────
   const handleShutterPress = useCallback(() => {
     if (isComplete || flashing || permission !== 'granted' || countdown !== null) return;
-    setCountdown(3);
+    setCountdown(2);
   }, [isComplete, flashing, permission, countdown]);
 
   // ── Status line ──────────────────────────────────────────────────
   const statusText =
-    count === 0    ? 'Druk op de rode knop om je eerste foto te maken'
-    : remaining === 1 ? 'Nog 1 foto — maak hem speciaal!'
-    : `Nog ${remaining} foto's te gaan`;
+    count === 0      ? 'Richt de camera en druk op de knop 📸'
+    : remaining === 1 ? 'Laatste foto — maak hem speciaal! ✨'
+    : `Nog ${remaining} te gaan — ga door!`;
 
   // ── Render ───────────────────────────────────────────────────────
   return (
