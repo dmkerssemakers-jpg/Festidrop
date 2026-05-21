@@ -50,24 +50,30 @@ export default function SendPage() {
         >
           <div className="relative w-36 h-44 mb-5">
             {[
-              { rotate: -9, y: 6,  z: 1 },
-              { rotate:  6, y: -4, z: 2 },
-              { rotate: -2, y: 0,  z: 3 },
+              { rotate: -9, y: 6,  z: 1, idx: photos.length - 3 },
+              { rotate:  6, y: -4, z: 2, idx: photos.length - 2 },
+              { rotate: -2, y: 0,  z: 3, idx: photos.length - 1 },
             ].map((s, i) => (
               <motion.div
                 key={i}
-                className="absolute w-28 h-36 rounded-sm left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+                className="absolute w-28 rounded-sm left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 overflow-hidden"
                 style={{
+                  height: '140px',
                   background: '#FEFDF8',
                   rotate: s.rotate,
                   translateY: s.y,
                   zIndex: s.z,
-                  boxShadow: '0 6px 24px rgba(7,22,47,0.18)',
+                  boxShadow: '0 6px 24px rgba(7,22,47,0.22)',
                 }}
                 initial={{ opacity: 0, scale: 0.85, rotate: 0 }}
                 animate={{ opacity: 1, scale: 1, rotate: s.rotate }}
                 transition={{ delay: i * 0.1, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-              />
+              >
+                {photos[s.idx] && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={photos[s.idx]} alt="" className="w-full h-full object-cover" />
+                )}
+              </motion.div>
             ))}
 
             {/* Foto-teller badge */}
