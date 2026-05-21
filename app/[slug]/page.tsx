@@ -2,7 +2,6 @@ import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import BackgroundPattern from '@/components/BackgroundPattern';
 import Header from '@/components/Header';
-import EventSubHeader from '@/components/EventSubHeader';
 import EventPhotoSession from '@/components/EventPhotoSession';
 
 export default async function EventPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -15,20 +14,18 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
   if (!event) notFound();
 
   return (
-    <main className="min-h-screen bg-page relative">
+    <main className="min-h-screen relative" style={{ backgroundColor: '#F7FBFF' }}>
+      {/* Subtle page color tint in event accent */}
+      <div
+        className="fixed inset-0 pointer-events-none -z-10"
+        style={{ background: `${event.accentColor}06` }}
+      />
       <BackgroundPattern accentColor={event.accentColor} />
 
-      {/* FestiDrop header — altijd zichtbaar */}
+      {/* FestiDrop header */}
       <Header />
 
-      {/* Event sub-header — onder FestiDrop logo, alleen als event naam/logo is ingesteld */}
-      <EventSubHeader
-        name={event.name}
-        logoUrl={event.logoUrl}
-        accentColor={event.accentColor}
-      />
-
-      {/* Extra padding voor de dubbele header */}
+      {/* Event branding is now inside the camera card — no sub-header clutter */}
       <EventPhotoSession
         eventId={event.id}
         eventName={event.name}
@@ -36,7 +33,6 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         maxPhotos={event.maxPhotos}
         slug={slug}
         logoUrl={event.logoUrl}
-        hasSubHeader
       />
     </main>
   );

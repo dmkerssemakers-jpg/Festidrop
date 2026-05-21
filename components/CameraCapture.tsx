@@ -76,6 +76,14 @@ type Props = {
   topOffset?:   string;
 };
 
+// Convert hex color to individual R,G,B values for mixing
+function hexToRgb(hex: string): [number, number, number] {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return [r, g, b];
+}
+
 export default function CameraCapture({
   onComplete,
   maxPhotos   = MAX,
@@ -110,6 +118,10 @@ export default function CameraCapture({
 
   const remaining  = maxPhotos - count;
   const isComplete = count >= maxPhotos;
+
+  // Derive a card background with a subtle tint of the accent color
+  const [ar, ag, ab] = accentColor.startsWith('#') ? hexToRgb(accentColor) : [7, 22, 47];
+  const cardBg = `rgba(${Math.round(7 + ar * 0.04)}, ${Math.round(22 + ag * 0.04)}, ${Math.round(47 + ab * 0.04)}, 0.92)`;
 
   // ── Start camera ────────────────────────────────────────────────
   const startCamera = useCallback(async () => {
@@ -219,19 +231,13 @@ export default function CameraCapture({
         transition={{ duration: 0.65, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
         className="relative rounded-[28px] overflow-hidden"
         style={{
-          background: 'rgba(7,22,47,0.88)',
-          border: '1px solid rgba(255,255,255,0.07)',
-          boxShadow: `0 32px 80px rgba(7,22,47,0.32), 0 0 0 1px rgba(255,255,255,0.04), 0 0 80px ${accentColor}22`,
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
+          background:          cardBg,
+          border:              `1px solid ${accentColor}30`,
+          boxShadow:           `0 32px 80px rgba(7,22,47,0.30), 0 0 0 1px rgba(255,255,255,0.04), 0 0 60px ${accentColor}30`,
+          backdropFilter:      'blur(24px)',
+          WebkitBackdropFilter:'blur(24px)',
         }}
       >
-        {/* Accent glow line at top */}
-        <div
-          className="absolute top-0 left-0 right-0 h-px"
-          style={{ background: `linear-gradient(90deg, transparent, ${accentColor}60, transparent)` }}
-        />
-
         {/* Flash overlay */}
         <AnimatePresence>
           {flashing && (
@@ -243,24 +249,64 @@ export default function CameraCapture({
           )}
         </AnimatePresence>
 
-        {/* Header bar */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-3">
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-red-ping" />
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-white/35">
-              Live
-            </span>
+        {/* ── Event branded header ─────────────────────────────── */}
+        <div
+          className="flex items-center justify-between px-5 pt-5 pb-4"
+          style={{ borderBottom: `1px solid ${accentColor}20` }}
+        >
+          {/* Event identity */}
+          <div className="flex items-center gap-3 min-w-0">
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logoUrl}
+                alt={eventName ?? 'Event'}
+                className="object-contain shrink-0"
+                style={{ maxHeight: '32px', maxWidth: '120px' }}
+              />
+            ) : eventName ? (
+              <>
+                <div
+                  className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-white"
+                  style={{
+                    background: `linear-gradient(135deg, ${accentColor}, ${accentColor}BB)`,
+                    fontSize: '8px', fontWeight: 900,
+                    boxShadow: `0 4px 12px ${accentColor}50`,
+                  }}
+                >
+                  ✦
+                </div>
+                <span
+                  className="font-black text-sm truncate"
+                  style={{ color: accentColor }}
+                >
+                  {eventName}
+                </span>
+              </>
+            ) : (
+              <span className="text-[11px] font-black uppercase tracking-[0.12em] text-white/30">
+                FestiDrop Camera
+              </span>
+            )}
           </div>
-          <div
-            className="px-2.5 py-1 rounded-full text-[10px] font-black"
-            style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)' }}
-          >
-            {count}/{maxPhotos}
+
+          {/* Live indicator + count */}
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full animate-red-ping bg-red-500" />
+              <span className="text-[9px] font-black uppercase tracking-[0.12em] text-white/25">Live</span>
+            </div>
+            <div
+              className="px-2.5 py-1 rounded-full text-[10px] font-black"
+              style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.40)' }}
+            >
+              {count}/{maxPhotos}
+            </div>
           </div>
         </div>
 
-        {/* Viewfinder */}
-        <div className="mx-4 rounded-2xl overflow-hidden aspect-square relative"
+        {/* ── Viewfinder ──────────────────────────────────────── */}
+        <div className="mx-4 mt-4 rounded-2xl overflow-hidden aspect-square relative"
           style={{ background: '#000' }}>
 
           {/* Permission: idle */}
@@ -288,7 +334,10 @@ export default function CameraCapture({
               <button
                 onClick={startCamera}
                 className="px-8 py-3 rounded-full text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
-                style={{ background: `linear-gradient(135deg, ${accentColor}, ${accentColor}CC)` }}
+                style={{
+                  background: `linear-gradient(135deg, ${accentColor}, ${accentColor}CC)`,
+                  boxShadow:  `0 8px 24px ${accentColor}40`,
+                }}
               >
                 Camera inschakelen
               </button>
@@ -340,7 +389,7 @@ export default function CameraCapture({
             style={{ display: permission === 'granted' ? 'block' : 'none' }}
           />
 
-          {/* Viewfinder corners — accent color */}
+          {/* Viewfinder corners */}
           {permission === 'granted' && !isComplete && (
             <>
               <div className="absolute top-3 left-3 w-7 h-7 border-t-2 border-l-2 rounded-tl"
@@ -404,9 +453,8 @@ export default function CameraCapture({
           )}
         </div>
 
-        {/* Stats + shutter */}
+        {/* ── Stats + shutter ──────────────────────────────────── */}
         <div className="flex items-center justify-between px-6 mt-5 mb-2">
-          {/* Foto count */}
           <div>
             <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/30 mb-0.5">Foto&apos;s</p>
             <p className="text-[28px] font-black leading-none tracking-[-0.04em] text-white">
@@ -415,7 +463,6 @@ export default function CameraCapture({
             </p>
           </div>
 
-          {/* Shutter button */}
           <motion.button
             onClick={handleShutterPress}
             whileTap={(isComplete || permission !== 'granted' || countdown !== null) ? {} : { scale: 0.86 }}
@@ -424,7 +471,7 @@ export default function CameraCapture({
             className="w-[80px] h-[80px] rounded-full flex items-center justify-center focus:outline-none disabled:opacity-35 disabled:cursor-not-allowed"
             style={{
               background: 'linear-gradient(145deg, #FF3838, #C00000)',
-              boxShadow: permission === 'granted' && !isComplete
+              boxShadow:  permission === 'granted' && !isComplete
                 ? '0 12px 32px rgba(255,30,30,0.45), inset 0 1px 0 rgba(255,255,255,0.18)'
                 : '0 6px 16px rgba(255,30,30,0.2)',
             }}
@@ -434,7 +481,6 @@ export default function CameraCapture({
             </div>
           </motion.button>
 
-          {/* Te gaan */}
           <div className="text-right">
             <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/30 mb-0.5">Te gaan</p>
             <p
@@ -449,7 +495,7 @@ export default function CameraCapture({
           </div>
         </div>
 
-        {/* Progress + status */}
+        {/* ── Progress + status ────────────────────────────────── */}
         <div className="px-5 pb-6">
           <ProgressStrip count={count} maxPhotos={maxPhotos} accentColor={accentColor} />
 

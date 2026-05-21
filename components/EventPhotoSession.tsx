@@ -3,16 +3,15 @@ import { useRouter } from 'next/navigation';
 import CameraCapture from './CameraCapture';
 
 interface Props {
-  eventId: string;
-  eventName: string;
-  accentColor: string;
-  maxPhotos: number;
-  slug: string;
-  logoUrl?: string | null;
-  hasSubHeader?: boolean;
+  eventId:      string;
+  eventName:    string;
+  accentColor:  string;
+  maxPhotos:    number;
+  slug:         string;
+  logoUrl?:     string | null;
 }
 
-export default function EventPhotoSession({ eventId, eventName, accentColor, slug, maxPhotos, logoUrl, hasSubHeader }: Props) {
+export default function EventPhotoSession({ eventId, eventName, accentColor, slug, maxPhotos, logoUrl }: Props) {
   const router = useRouter();
   const storageKey = `festidrop_photos_${slug}`;
 
@@ -31,7 +30,7 @@ export default function EventPhotoSession({ eventId, eventName, accentColor, slu
       logoUrl={logoUrl}
       eventName={eventName}
       accentColor={accentColor}
-      topOffset={hasSubHeader ? 'pt-36' : 'pt-24'}
+      topOffset="pt-24"
     />
   );
 }
