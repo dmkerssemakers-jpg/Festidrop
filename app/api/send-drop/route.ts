@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { kv } from '@vercel/kv';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = process.env.RESEND_FROM ?? 'FestiDrop <onboarding@resend.dev>';
+
+// Whitelisted e-mails die de limiet omzeilen (komma-gescheiden in env var)
+const TEST_EMAILS = (process.env.TEST_EMAILS ?? '')
+  .split(',')
+  .map(e => e.trim().toLowerCase())
+  .filter(Boolean);
 
 export async function POST(req: NextRequest) {
   const { email, photos } = (await req.json()) as {
@@ -15,6 +22,26 @@ export async function POST(req: NextRequest) {
       { error: 'email en foto\'s zijn verplicht' },
       { status: 400 }
     );
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const isTestEmail = TEST_EMAILS.includes(normalizedEmail);
+  const kvKey = `drop:${normalizedEmail}`;
+
+  // ── Rate-limit check (alleen als KV geconfigureerd is) ───────────
+  if (!isTestEmail) {
+    try {
+      const alreadyUsed = await kv.get(kvKey);
+      if (alreadyUsed) {
+        return NextResponse.json(
+          { error: 'Dit e-mailadres heeft al een FestiDrop ontvangen. Tot de volgende editie! 🎉' },
+          { status: 429 }
+        );
+      }
+    } catch {
+      // KV niet geconfigureerd of niet bereikbaar — sla limiet over
+      console.warn('[send-drop] KV niet beschikbaar, rate-limit overgeslagen');
+    }
   }
 
   // Strip data-URL header → raw base64
@@ -97,7 +124,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Resend: ${error.message}` }, { status: 500 });
     }
 
-    console.log('[send-drop] Sent OK, id:', data?.id);
+    // ── Registreer gebruik in KV (24 uur geldig) ─────────────────
+    if (!isTestEmail) {
+      try {
+        await kv.set(kvKey, 1, { ex: 86400 });
+      } catch {
+        console.warn('[send-drop] KV write mislukt, gebruik niet opgeslagen');
+      }
+    }
+
+    console.log('[send-drop] Sent OK, id:', data?.id, isTestEmail ? '(test email, geen limiet)' : '');
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error('[send-drop] Unexpected error:', err);
