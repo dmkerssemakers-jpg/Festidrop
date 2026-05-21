@@ -8,9 +8,10 @@ interface Props {
   accentColor: string;
   maxPhotos: number;
   slug: string;
+  logoUrl?: string | null;
 }
 
-export default function EventPhotoSession({ eventId, slug, maxPhotos }: Props) {
+export default function EventPhotoSession({ eventId, eventName, slug, maxPhotos, logoUrl }: Props) {
   const router = useRouter();
   const storageKey = `festidrop_photos_${slug}`;
 
@@ -21,5 +22,13 @@ export default function EventPhotoSession({ eventId, slug, maxPhotos }: Props) {
     router.push(`/${slug}/send`);
   }
 
-  return <CameraCapture onComplete={handleComplete} maxPhotos={maxPhotos} eventId={eventId} />;
+  return (
+    <CameraCapture
+      onComplete={handleComplete}
+      maxPhotos={maxPhotos}
+      eventId={eventId}
+      logoUrl={logoUrl}
+      eventName={eventName}
+    />
+  );
 }

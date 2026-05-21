@@ -88,15 +88,28 @@ type Props = {
   onComplete: (photos: string[]) => void;
   maxPhotos?: number;
   eventId?: string;
+  logoUrl?: string | null;
+  eventName?: string;
 };
 
-export default function CameraCapture({ onComplete, maxPhotos = MAX }: Props) {
-  const videoRef   = useRef<HTMLVideoElement>(null);
-  const canvasRef  = useRef<HTMLCanvasElement>(null);
-  const streamRef  = useRef<MediaStream | null>(null);
-  const photosRef  = useRef<string[]>([]);       // accumulates all captured base64 strings
+export default function CameraCapture({ onComplete, maxPhotos = MAX, logoUrl, eventName }: Props) {
+  const videoRef      = useRef<HTMLVideoElement>(null);
+  const canvasRef     = useRef<HTMLCanvasElement>(null);
+  const streamRef     = useRef<MediaStream | null>(null);
+  const photosRef     = useRef<string[]>([]);
+  const logoImgRef    = useRef<HTMLImageElement | null>(null);
   const onCompleteRef = useRef(onComplete);
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
+
+  // Pre-load logo image so it's ready when shoot() fires
+  useEffect(() => {
+    if (!logoUrl) { logoImgRef.current = null; return; }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => { logoImgRef.current = img; };
+    img.onerror = () => { logoImgRef.current = null; };
+    img.src = logoUrl;
+  }, [logoUrl]);
 
   const [count,        setCount]        = useState(0);
   const [flashing,     setFlashing]     = useState(false);
@@ -160,12 +173,25 @@ export default function CameraCapture({ onComplete, maxPhotos = MAX }: Props) {
     // Apply Polaroid 600 film filter (grain + color grade + vignette + light leak)
     applyPolaroidFilter(ctx, pad, pad, img, img);
 
-    // Alleen FestiDrop branding — geen nummering
+    // ── Polaroid label — logo of tekst ──────────────────────────
     const labelMidY = pad + img + POLAROID_BTM / 2;
-    ctx.fillStyle = '#8A94A6';
-    ctx.font = '700 15px Inter, ui-sans-serif, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('FestiDrop', W / 2, labelMidY + 6);
+    const logoImg = logoImgRef.current;
+
+    if (logoImg) {
+      // Schaal logo zodat het past in de witte ruimte (max breedte 200px, max hoogte 60px)
+      const maxW = 200, maxH = 60;
+      const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight, 1);
+      const lw = logoImg.naturalWidth * ratio;
+      const lh = logoImg.naturalHeight * ratio;
+      ctx.drawImage(logoImg, W / 2 - lw / 2, labelMidY - lh / 2, lw, lh);
+    } else {
+      // Tekst: event naam of FestiDrop fallback
+      const label = eventName ?? 'FestiDrop';
+      ctx.fillStyle = '#8A94A6';
+      ctx.font = '700 15px Inter, ui-sans-serif, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, W / 2, labelMidY + 6);
+    }
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
 
