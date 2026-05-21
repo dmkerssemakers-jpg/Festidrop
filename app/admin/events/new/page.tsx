@@ -1,4 +1,4 @@
-import EventForm from '@/components/admin/EventForm';
+import NewEventForm from '@/components/admin/NewEventForm';
 
 export default function NewEventPage() {
   return (
@@ -9,7 +9,7 @@ export default function NewEventPage() {
         </h1>
         <p className="text-sm text-muted mt-1">Maak een nieuwe FestiDrop sessie aan</p>
       </div>
-      <EventForm />
+      <NewEventForm />
     </div>
   );
 }
