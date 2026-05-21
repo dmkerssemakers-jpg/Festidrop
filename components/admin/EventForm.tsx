@@ -3,6 +3,8 @@ import { useRef, useState, useTransition } from 'react';
 import { updateEvent, deleteEvent } from '@/lib/actions';
 import type { Event } from '@prisma/client';
 
+type UploadState = 'idle' | 'uploading' | 'done' | 'error';
+
 const COLORS = [
   { hex: '#1E8BFF', label: 'Blauw' },
   { hex: '#20D6E8', label: 'Aqua' },
@@ -29,13 +31,41 @@ export default function EventForm({ event }: Props) {
   const [isActive, setIsActive]     = useState(event.isActive);
   const [saved, setSaved]           = useState(false);
   const [logoUrl, setLogoUrl]       = useState(event.logoUrl ?? '');
-  const [showCode, setShowCode]     = useState(false);
-  const formRef = useRef<HTMLFormElement>(null);
+  const [showCode,     setShowCode]     = useState(false);
+  const [uploadState,  setUploadState]  = useState<UploadState>('idle');
+  const [uploadError,  setUploadError]  = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const formRef      = useRef<HTMLFormElement>(null);
 
   // Format endsAt for datetime-local input (YYYY-MM-DDTHH:mm)
   const endsAtValue = event.endsAt
     ? new Date(event.endsAt).toISOString().slice(0, 16)
     : '';
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadState('uploading');
+    setUploadError('');
+
+    const fd = new FormData();
+    fd.append('file', file);
+
+    try {
+      const res  = await fetch('/api/admin/upload-logo', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Upload mislukt');
+      setLogoUrl(data.url);
+      setUploadState('done');
+    } catch (err) {
+      setUploadState('error');
+      setUploadError(err instanceof Error ? err.message : 'Upload mislukt');
+    } finally {
+      // Reset file input so same file can be re-selected
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -227,20 +257,67 @@ export default function EventForm({ event }: Props) {
              style={{ color: 'rgba(108,122,141,0.6)' }}>Personalisatie</p>
           <div className="space-y-4">
 
-            {/* Logo URL + live thumbnail */}
+            {/* Logo — upload or URL */}
             <div>
               <label className="field-label block mb-1.5">
-                Logo URL <span className="text-[10px] text-muted normal-case font-normal">optioneel</span>
+                Logo <span className="text-[10px] text-muted normal-case font-normal">optioneel</span>
               </label>
-              <div className="flex gap-2 items-center">
+
+              {/* Upload button + URL input row */}
+              <div className="flex gap-2 items-center mb-2">
+                {/* Hidden file input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                />
+
+                {/* Upload button */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadState === 'uploading'}
+                  className="shrink-0 flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all hover:opacity-80 disabled:opacity-50"
+                  style={{
+                    background: uploadState === 'done'
+                      ? 'rgba(0,200,150,0.12)'
+                      : 'rgba(30,139,255,0.10)',
+                    border: uploadState === 'done'
+                      ? '1px solid rgba(0,200,150,0.3)'
+                      : '1px solid rgba(30,139,255,0.25)',
+                    color: uploadState === 'done' ? '#00A878' : '#1E8BFF',
+                  }}
+                >
+                  {uploadState === 'uploading' ? (
+                    <span className="w-3.5 h-3.5 border-2 border-blue-300/40 border-t-blue-400 rounded-full animate-spin" />
+                  ) : uploadState === 'done' ? (
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  ) : (
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M6 1v7M3 4l3-3 3 3M1 10h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                  {uploadState === 'uploading' ? 'Uploaden…' : uploadState === 'done' ? 'Geüpload!' : 'Upload afbeelding'}
+                </button>
+
+                {/* Or divider */}
+                <span className="text-[10px] text-muted font-medium">of</span>
+
+                {/* URL input */}
                 <input
                   name="logoUrl"
                   type="url"
                   value={logoUrl}
-                  onChange={(e) => setLogoUrl(e.target.value)}
+                  onChange={(e) => { setLogoUrl(e.target.value); setUploadState('idle'); }}
                   placeholder="https://..."
-                  className="field flex-1"
+                  className="field flex-1 min-w-0"
                 />
+
+                {/* Preview */}
                 {logoUrl && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -249,10 +326,29 @@ export default function EventForm({ event }: Props) {
                     className="h-9 w-9 rounded-lg object-contain border shrink-0"
                     style={{ borderColor: 'rgba(189,239,255,0.6)', background: '#fff', padding: '4px' }}
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                    onLoad={(e) => { (e.target as HTMLImageElement).style.display = 'block'; }}
+                    onLoad={(e)  => { (e.target as HTMLImageElement).style.display = 'block'; }}
                   />
                 )}
               </div>
+
+              {/* Clear button */}
+              {logoUrl && (
+                <button
+                  type="button"
+                  onClick={() => { setLogoUrl(''); setUploadState('idle'); setUploadError(''); }}
+                  className="text-[10px] font-semibold transition-colors hover:opacity-70"
+                  style={{ color: '#6C7A8D' }}
+                >
+                  × Logo verwijderen
+                </button>
+              )}
+
+              {/* Upload error */}
+              {uploadState === 'error' && uploadError && (
+                <p className="text-[11px] mt-1 font-medium" style={{ color: '#FF6B35' }}>
+                  ⚠ {uploadError}
+                </p>
+              )}
             </div>
 
             {/* Email text */}
