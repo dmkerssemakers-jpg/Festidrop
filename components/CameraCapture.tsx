@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ProgressStrip from './ProgressStrip';
 import { DEFAULT_DESIGN } from '@/lib/polaroid-design';
 import type { PolaroidDesign } from '@/lib/polaroid-design';
-import { applyPolaroidFilter } from '@/lib/polaroid-renderer';
+import { applyPolaroidFilter, applyLabelStyle } from '@/lib/polaroid-renderer';
 
 const MAX = 10;
 const FRAME_SIZE   = 600;
@@ -236,24 +236,35 @@ export default function CameraCapture({
     // Clear label area and redraw
     ctx.fillStyle = d.labelBg;
     ctx.fillRect(0, FRAME_SIZE, W, POLAROID_BTM);
+    applyLabelStyle(ctx, d.labelStyle, accentColor, W);
 
     const noteClean = note.trim();
     if (noteClean) {
-      // Memory text — large handwriting font, hero of the label area
-      const fontSize = noteClean.length > 26 ? 32 : noteClean.length > 16 ? 38 : 44;
-      ctx.font       = `700 ${fontSize}px Caveat, var(--font-caveat), cursive`;
-      ctx.fillStyle  = d.labelTextColor;
-      ctx.textAlign  = 'center';
-      ctx.fillText(noteClean, W / 2, FRAME_SIZE + 68, W - 48);
-
-      ctx.font      = '700 20px Caveat, cursive';
-      ctx.fillStyle = '#C0392B';
-      ctx.fillText('♥', W / 2, FRAME_SIZE + 98);
-
-      ctx.font      = '500 10px Inter, ui-sans-serif, sans-serif';
-      ctx.fillStyle = 'rgba(0,0,0,0.20)';
-      ctx.textAlign = 'center';
-      ctx.fillText((eventName ?? 'FestiDrop').toUpperCase(), W / 2, FRAME_SIZE + 136);
+      // Memory text
+      if (d.noteFont === 'uppercase') {
+        const fontSize = noteClean.length > 26 ? 13 : noteClean.length > 16 ? 16 : 19;
+        ctx.font      = `900 ${fontSize}px Inter, ui-sans-serif, sans-serif`;
+        ctx.fillStyle = d.labelTextColor;
+        ctx.textAlign = 'center';
+        ctx.fillText(noteClean.toUpperCase(), W / 2, FRAME_SIZE + 64, W - 60);
+        ctx.strokeStyle = accentColor;
+        ctx.lineWidth   = 2;
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(W / 2 - 40, FRAME_SIZE + 76);
+        ctx.lineTo(W / 2 + 40, FRAME_SIZE + 76);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      } else {
+        const fontSize = noteClean.length > 26 ? 32 : noteClean.length > 16 ? 38 : 44;
+        ctx.font      = `700 ${fontSize}px Caveat, var(--font-caveat), cursive`;
+        ctx.fillStyle = d.labelTextColor;
+        ctx.textAlign = 'center';
+        ctx.fillText(noteClean, W / 2, FRAME_SIZE + 68, W - 48);
+        ctx.font      = '700 18px Caveat, cursive';
+        ctx.fillStyle = '#C0392B';
+        ctx.fillText('♥', W / 2, FRAME_SIZE + 96);
+      }
     } else {
       // No note — show logo or event name based on design config
       const logoImg   = logoImgRef.current;
@@ -286,6 +297,14 @@ export default function CameraCapture({
           ctx.fillText('FestiDrop', W / 2, labelMidY + 6);
         }
       }
+    }
+
+    // Tagline at very bottom of label
+    if (d.labelTagline.trim()) {
+      ctx.font      = '600 10px Inter, ui-sans-serif, sans-serif';
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.textAlign = 'center';
+      ctx.fillText(d.labelTagline.trim().toUpperCase(), W / 2, FRAME_SIZE + POLAROID_BTM - 10, W - 48);
     }
 
     const finalDataUrl = canvas.toDataURL('image/jpeg', 0.88);

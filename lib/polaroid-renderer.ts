@@ -1,8 +1,83 @@
-import type { PolaroidDesign } from './polaroid-design';
+import type { PolaroidDesign, LabelStyle } from './polaroid-design';
 
 export const FRAME_SIZE   = 600;
 export const POLAROID_BTM = 150;
 const PAD = 20;
+
+// ── Colour helper ─────────────────────────────────────────────────────────────
+function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// ── Label visual decoration ───────────────────────────────────────────────────
+export function applyLabelStyle(
+  ctx:         CanvasRenderingContext2D,
+  style:       LabelStyle,
+  accentColor: string,
+  W:           number,
+): void {
+  const y = FRAME_SIZE;
+  const h = POLAROID_BTM;
+
+  switch (style) {
+    case 'accent-line': {
+      ctx.fillStyle = accentColor;
+      ctx.fillRect(0, y, W, 5);
+      break;
+    }
+    case 'gradient': {
+      const g = ctx.createLinearGradient(0, y, 0, y + h);
+      g.addColorStop(0,   hexToRgba(accentColor, 0.24));
+      g.addColorStop(0.55, hexToRgba(accentColor, 0.06));
+      g.addColorStop(1,   'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, y, W, h);
+      break;
+    }
+    case 'duotone': {
+      // Diagonal sweep from top-left in accent colour
+      const g = ctx.createLinearGradient(0, y, W, y + h);
+      g.addColorStop(0,    hexToRgba(accentColor, 0.30));
+      g.addColorStop(0.45, hexToRgba(accentColor, 0.08));
+      g.addColorStop(1,    'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, y, W, h);
+      break;
+    }
+    case 'dots': {
+      ctx.save();
+      ctx.globalAlpha = 0.13;
+      ctx.fillStyle   = accentColor;
+      const spacing = 14, r = 1.5;
+      for (let px = spacing / 2; px < W; px += spacing) {
+        for (let py = y + spacing / 2; py < y + h; py += spacing) {
+          ctx.beginPath();
+          ctx.arc(px, py, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+      break;
+    }
+    case 'grain': {
+      const imageData = ctx.getImageData(0, y, W, h);
+      const d = imageData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const n = (Math.random() - 0.5) * 22;
+        d[i]   = Math.max(0, Math.min(255, d[i]   + n));
+        d[i+1] = Math.max(0, Math.min(255, d[i+1] + n));
+        d[i+2] = Math.max(0, Math.min(255, d[i+2] + n));
+      }
+      ctx.putImageData(imageData, 0, y);
+      break;
+    }
+    // 'solid': no overlay needed
+  }
+}
 
 // ── Authentic Polaroid 600 film filter (parameterized strength) ───────────────
 export function applyPolaroidFilter(
@@ -148,12 +223,13 @@ export function drawPlaceholderPhoto(
 
 // ── Full single-pass polaroid render (for designer preview) ──────────────────
 export interface RenderOptions {
-  design:      PolaroidDesign;
-  eventName?:  string;
-  logoImg?:    HTMLImageElement | null;
-  noteText?:   string;
-  photoEl?:    HTMLVideoElement | HTMLImageElement | null;
-  sampleDate?: Date;
+  design:       PolaroidDesign;
+  eventName?:   string;
+  logoImg?:     HTMLImageElement | null;
+  noteText?:    string;
+  photoEl?:     HTMLVideoElement | HTMLImageElement | null;
+  sampleDate?:  Date;
+  accentColor?: string;   // used by label style patterns
 }
 
 export async function renderPolaroid(
@@ -165,6 +241,7 @@ export async function renderPolaroid(
     noteText     = '',
     photoEl      = null,
     sampleDate   = new Date(),
+    accentColor  = '#1E8BFF',
   }: RenderOptions,
 ): Promise<void> {
   const W   = FRAME_SIZE;
@@ -229,47 +306,70 @@ export async function renderPolaroid(
     ctx.restore();
   }
 
-  // ── Label area ────────────────────────────────────────────────────
+  // ── Label background ──────────────────────────────────────────────
   ctx.fillStyle = design.labelBg;
   ctx.fillRect(0, FRAME_SIZE, W, POLAROID_BTM);
 
+  // ── Label style decoration ────────────────────────────────────────
+  applyLabelStyle(ctx, design.labelStyle, accentColor, W);
+
+  // ── Label content ─────────────────────────────────────────────────
   const noteClean = noteText.trim();
+  // Tagline takes space at the bottom — adjust content area accordingly
+  const hasTagline = design.labelTagline.trim().length > 0;
+  const contentBottom = FRAME_SIZE + POLAROID_BTM - (hasTagline ? 22 : 10);
 
   if (noteClean) {
     try {
       if (typeof document !== 'undefined') await document.fonts.load('700 44px Caveat');
     } catch { /* font fallback */ }
 
-    const fontSize = noteClean.length > 26 ? 32 : noteClean.length > 16 ? 38 : 44;
-    ctx.font      = `700 ${fontSize}px Caveat, var(--font-caveat), cursive`;
-    ctx.fillStyle = design.labelTextColor;
-    ctx.textAlign = 'center';
-    ctx.fillText(noteClean, W / 2, FRAME_SIZE + 68, W - 48);
+    if (design.noteFont === 'uppercase') {
+      // Strak uppercase stijl
+      const fontSize = noteClean.length > 26 ? 13 : noteClean.length > 16 ? 16 : 19;
+      ctx.font      = `900 ${fontSize}px Inter, ui-sans-serif, sans-serif`;
+      ctx.fillStyle = design.labelTextColor;
+      ctx.textAlign = 'center';
+      ctx.fillText(noteClean.toUpperCase(), W / 2, FRAME_SIZE + 64, W - 60);
+      // Thin accent line below text
+      ctx.strokeStyle = accentColor;
+      ctx.lineWidth   = 2;
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(W / 2 - 40, FRAME_SIZE + 76);
+      ctx.lineTo(W / 2 + 40, FRAME_SIZE + 76);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    } else {
+      // Handschrift stijl (Caveat)
+      const fontSize = noteClean.length > 26 ? 32 : noteClean.length > 16 ? 38 : 44;
+      ctx.font      = `700 ${fontSize}px Caveat, var(--font-caveat), cursive`;
+      ctx.fillStyle = design.labelTextColor;
+      ctx.textAlign = 'center';
+      ctx.fillText(noteClean, W / 2, FRAME_SIZE + 68, W - 48);
 
-    ctx.font      = '700 20px Caveat, cursive';
-    ctx.fillStyle = '#C0392B';
-    ctx.fillText('♥', W / 2, FRAME_SIZE + 98);
-
-    ctx.font      = '500 10px Inter, ui-sans-serif, sans-serif';
-    ctx.fillStyle = 'rgba(0,0,0,0.20)';
-    ctx.textAlign = 'center';
-    ctx.fillText((eventName ?? 'FestiDrop').toUpperCase(), W / 2, FRAME_SIZE + 136);
+      ctx.font      = '700 18px Caveat, cursive';
+      ctx.fillStyle = '#C0392B';
+      ctx.fillText('♥', W / 2, FRAME_SIZE + 96);
+    }
 
   } else {
-    const labelMidY = FRAME_SIZE + POLAROID_BTM / 2;
+    // No note — logo or event name
+    const usableH  = contentBottom - FRAME_SIZE;
+    const labelMidY = FRAME_SIZE + usableH / 2;
 
     if (logoImg && design.logoPosition !== 'hidden') {
       if (design.logoPosition === 'center') {
-        const maxW = 220, maxH = 70;
+        const maxW = 220, maxH = 64;
         const r  = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight, 1);
         const lw = logoImg.naturalWidth * r, lh = logoImg.naturalHeight * r;
         ctx.drawImage(logoImg, W / 2 - lw / 2, labelMidY - lh / 2, lw, lh);
       } else {
-        const maxW = 160, maxH = 40;
+        const maxW = 160, maxH = 38;
         const r  = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight, 1);
         const lw = logoImg.naturalWidth * r, lh = logoImg.naturalHeight * r;
         ctx.globalAlpha = 0.65;
-        ctx.drawImage(logoImg, W / 2 - lw / 2, FRAME_SIZE + POLAROID_BTM - lh - 12, lw, lh);
+        ctx.drawImage(logoImg, W / 2 - lw / 2, contentBottom - lh - 4, lw, lh);
         ctx.globalAlpha = 1;
       }
     } else if (design.logoPosition !== 'hidden') {
@@ -285,5 +385,18 @@ export async function renderPolaroid(
         ctx.fillText('FestiDrop', W / 2, labelMidY + 6);
       }
     }
+  }
+
+  // ── Tagline (persistent, bottom of label) ────────────────────────
+  if (hasTagline) {
+    ctx.font      = '600 10px Inter, ui-sans-serif, sans-serif';
+    ctx.fillStyle = hexToRgba(design.labelTextColor, 0.38);
+    ctx.textAlign = 'center';
+    ctx.fillText(
+      design.labelTagline.trim().toUpperCase(),
+      W / 2,
+      FRAME_SIZE + POLAROID_BTM - 10,
+      W - 48,
+    );
   }
 }

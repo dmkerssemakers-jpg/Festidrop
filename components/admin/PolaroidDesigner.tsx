@@ -51,11 +51,12 @@ export default function PolaroidDesigner({
     await renderPolaroid(canvas, {
       design,
       eventName,
-      logoImg:  logoImgRef.current,
-      noteText: showNote ? previewNote : '',
-      photoEl:  testImgRef.current,
+      logoImg:     logoImgRef.current,
+      noteText:    showNote ? previewNote : '',
+      photoEl:     testImgRef.current,
+      accentColor,
     });
-  }, [design, eventName, showNote, previewNote]);
+  }, [design, eventName, showNote, previewNote, accentColor]);
 
   useEffect(() => { doRender(); }, [doRender, renderKey]);
 
@@ -75,6 +76,15 @@ export default function PolaroidDesigner({
     };
     reader.readAsDataURL(file);
     e.target.value = '';
+  }
+
+  function handleDownload() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const a = document.createElement('a');
+    a.download = `${eventName.toLowerCase().replace(/\s+/g, '-')}-polaroid.png`;
+    a.href = canvas.toDataURL('image/png');
+    a.click();
   }
 
   function handleSave() {
@@ -128,6 +138,18 @@ export default function PolaroidDesigner({
           {saveState === 'error' && (
             <span className="text-xs font-semibold text-red-500">Opslaan mislukt</span>
           )}
+          {/* Download preview */}
+          <button
+            onClick={handleDownload}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all hover:opacity-80"
+            style={{ background: 'rgba(0,0,0,0.06)', color: '#6C7A8D', border: '1px solid rgba(0,0,0,0.08)' }}
+            title="Download preview als PNG"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M2 9.5h8M6 2v6M3.5 5.5L6 8l2.5-2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Download
+          </button>
           <button
             onClick={handleSave}
             disabled={isPending}
@@ -294,6 +316,125 @@ export default function PolaroidDesigner({
                     }>
                     <span className="text-[15px] leading-none">{ico}</span>
                     {lbl}
+                  </button>
+                ))}
+              </div>
+            </Card>
+
+            {/* Label Design Stijlen */}
+            <Card title="Label Design">
+              <p className="text-[11px] text-muted -mt-1 mb-3 leading-snug">
+                Visuele stijl voor het witte vlak — past zich aan jouw merkkleur aan
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  ['solid',       'Puur',       null],
+                  ['accent-line', 'Accentlijn', 'line'],
+                  ['gradient',    'Verloop',    'gradient'],
+                  ['duotone',     'Diagonaal',  'duotone'],
+                  ['dots',        'Stippen',    'dots'],
+                  ['grain',       'Korrel',     'grain'],
+                ] as [PolaroidDesign['labelStyle'], string, string | null][]).map(([val, lbl, pat]) => (
+                  <button key={val} onClick={() => set('labelStyle', val)}
+                    className="rounded-xl overflow-hidden transition-all"
+                    style={{
+                      border: design.labelStyle === val
+                        ? `2px solid ${accentColor}`
+                        : '2px solid rgba(0,0,0,0.08)',
+                      outline:      design.labelStyle === val ? `2px solid ${accentColor}30` : 'none',
+                      outlineOffset: '1px',
+                    }}>
+                    {/* Mini label preview */}
+                    <div style={{ height: '34px', background: design.labelBg, position: 'relative', overflow: 'hidden' }}>
+                      {pat === 'line' && (
+                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: accentColor }} />
+                      )}
+                      {pat === 'gradient' && (
+                        <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(180deg, ${accentColor}44 0%, transparent 100%)` }} />
+                      )}
+                      {pat === 'duotone' && (
+                        <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(135deg, ${accentColor}44 0%, transparent 60%)` }} />
+                      )}
+                      {pat === 'dots' && (
+                        <div style={{
+                          position: 'absolute', inset: 0,
+                          backgroundImage: `radial-gradient(circle, ${accentColor}44 1px, transparent 1px)`,
+                          backgroundSize: '7px 7px',
+                        }} />
+                      )}
+                      {pat === 'grain' && (
+                        <div style={{
+                          position: 'absolute', inset: 0,
+                          backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.75\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\' opacity=\'0.08\'/%3E%3C/svg%3E")',
+                        }} />
+                      )}
+                    </div>
+                    <div className="py-1 text-[10px] font-bold text-center"
+                      style={{ color: design.labelStyle === val ? accentColor : '#8A94A6', background: 'rgba(0,0,0,0.03)' }}>
+                      {lbl}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </Card>
+
+            {/* Label Tagline */}
+            <Card title="Label Tagline">
+              <p className="text-[11px] text-muted -mt-1 mb-2 leading-snug">
+                Vaste tekst onderaan de polaroid — bijv. eventnaam, datum of #hashtag
+              </p>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={design.labelTagline}
+                  onChange={e => set('labelTagline', e.target.value.slice(0, 40))}
+                  placeholder="BONDGENOTEN FESTIVAL 2025"
+                  maxLength={40}
+                  className="w-full px-3 py-2 rounded-xl text-xs outline-none"
+                  style={{
+                    background:   'rgba(0,0,0,0.05)',
+                    border:       '1px solid rgba(0,0,0,0.09)',
+                    color:        '#07162F',
+                    fontFamily:   'Inter, sans-serif',
+                    paddingRight: '36px',
+                  }}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold tabular-nums"
+                  style={{ color: design.labelTagline.length > 34 ? '#FF6B35' : 'rgba(0,0,0,0.25)' }}>
+                  {design.labelTagline.length}/40
+                </span>
+              </div>
+              {design.labelTagline && (
+                <button onClick={() => set('labelTagline', '')}
+                  className="mt-1.5 text-[10px] font-bold text-muted hover:text-navy transition-colors">
+                  × Verwijder tagline
+                </button>
+              )}
+            </Card>
+
+            {/* Note font */}
+            <Card title="Herinnering Lettertype">
+              <p className="text-[11px] text-muted -mt-1 mb-3 leading-snug">
+                Hoe de geheugen-tekst op de polaroid verschijnt
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  ['caveat',    'Handschrift', 'Best night ever ♥', 'var(--font-caveat), Caveat, cursive', '18px'],
+                  ['uppercase', 'Strak',       'BEST NIGHT EVER',  'Inter, sans-serif',                  '10px'],
+                ] as [PolaroidDesign['noteFont'], string, string, string, string][]).map(([val, lbl, preview, font, size]) => (
+                  <button key={val} onClick={() => set('noteFont', val)}
+                    className="rounded-xl p-2.5 flex flex-col items-center gap-1.5 transition-all"
+                    style={design.noteFont === val
+                      ? { background: `${accentColor}12`, border: `1.5px solid ${accentColor}45` }
+                      : { background: 'rgba(0,0,0,0.05)', border: '1.5px solid transparent' }
+                    }>
+                    <span style={{ fontFamily: font, fontSize: size, fontWeight: val === 'uppercase' ? 900 : 700, color: '#2C1810', lineHeight: 1.2 }}>
+                      {preview}
+                    </span>
+                    <span className="text-[10px] font-bold"
+                      style={{ color: design.noteFont === val ? accentColor : '#8A94A6' }}>
+                      {lbl}
+                    </span>
                   </button>
                 ))}
               </div>
