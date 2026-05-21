@@ -8,6 +8,17 @@ const COLORS = [
   '#00C896', '#FFB800', '#FF1E5B',
 ];
 
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://festidrop.vercel.app';
+
+function toSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
 interface Props {
   event?: Event;
 }
@@ -17,12 +28,31 @@ export default function EventForm({ event }: Props) {
   const [isPending, startTransition] = useTransition();
   const [color, setColor] = useState(event?.accentColor ?? '#1E8BFF');
   const [saved, setSaved] = useState(false);
+  const [slug, setSlug] = useState(event?.slug ?? '');
+  const [name, setName] = useState(event?.name ?? '');
   const formRef = useRef<HTMLFormElement>(null);
+
+  // Auto-fill slug from name on create (only if slug not yet manually set)
+  const slugTouched = useRef(!!event?.slug);
+
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setName(e.target.value);
+    if (!isEdit && !slugTouched.current) {
+      setSlug(toSlug(e.target.value));
+    }
+  };
+
+  const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    slugTouched.current = true;
+    // Only allow lowercase letters, numbers and hyphens
+    setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
+  };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     fd.set('accentColor', color);
+    fd.set('slug', slug);
 
     startTransition(async () => {
       if (isEdit) {
@@ -58,22 +88,60 @@ export default function EventForm({ event }: Props) {
         <Field label="Naam">
           <input
             name="name"
-            defaultValue={event?.name}
+            value={name}
+            onChange={handleNameChange}
             required
             placeholder="bijv. Lowlands 2026"
             className="field"
           />
         </Field>
 
-        {/* Slug */}
-        <Field label="URL slug" hint="Automatisch ingevuld op basis van naam">
-          <input
-            name="slug"
-            defaultValue={event?.slug}
-            placeholder="bijv. lowlands-2026"
-            className="field"
-          />
-        </Field>
+        {/* Slug — locked on edit, live preview on create */}
+        <div>
+          <div className="flex items-baseline gap-2 mb-1.5">
+            <label className="text-xs font-bold text-muted uppercase tracking-[0.1em]">
+              Event URL
+            </label>
+            {isEdit && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                style={{ background: 'rgba(255,184,0,0.12)', color: '#B07800' }}>
+                🔒 Vast na aanmaken
+              </span>
+            )}
+          </div>
+
+          {/* URL preview bar */}
+          <div
+            className="flex items-center rounded-xl overflow-hidden text-sm"
+            style={{ border: '1px solid rgba(189,239,255,0.6)', background: 'rgba(247,251,255,0.8)' }}
+          >
+            <span className="px-3 py-2.5 text-muted text-xs font-medium shrink-0 border-r"
+              style={{ borderColor: 'rgba(189,239,255,0.6)', background: 'rgba(189,239,255,0.15)' }}>
+              {BASE_URL}/
+            </span>
+            {isEdit ? (
+              <>
+                <span className="px-3 py-2.5 font-bold text-navy flex-1">{event.slug}</span>
+                <input type="hidden" name="slug" value={event.slug} />
+              </>
+            ) : (
+              <input
+                name="slug"
+                value={slug}
+                onChange={handleSlugChange}
+                required
+                placeholder="jouw-event-naam"
+                className="flex-1 px-3 py-2.5 bg-transparent outline-none font-bold text-navy placeholder:text-muted placeholder:font-normal"
+              />
+            )}
+          </div>
+
+          {!isEdit && slug && (
+            <p className="text-[11px] text-muted mt-1.5 ml-1">
+              → <span className="font-semibold text-azure">{BASE_URL}/{slug}</span>
+            </p>
+          )}
+        </div>
 
         {/* Max photos */}
         <Field label="Max foto's per sessie">
