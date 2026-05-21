@@ -2,69 +2,13 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ProgressStrip from './ProgressStrip';
+import { DEFAULT_DESIGN } from '@/lib/polaroid-design';
+import type { PolaroidDesign } from '@/lib/polaroid-design';
+import { applyPolaroidFilter } from '@/lib/polaroid-renderer';
 
 const MAX = 10;
 const FRAME_SIZE   = 600;
 const POLAROID_BTM = 150;
-
-// ── Authentic Polaroid 600 film filter ───────────────────────────────
-function applyPolaroidFilter(
-  ctx: CanvasRenderingContext2D,
-  px: number, py: number, pw: number, ph: number
-): void {
-  const imageData = ctx.getImageData(px, py, pw, ph);
-  const d = imageData.data;
-
-  const R = new Uint8ClampedArray(256);
-  const G = new Uint8ClampedArray(256);
-  const B = new Uint8ClampedArray(256);
-
-  for (let i = 0; i < 256; i++) {
-    const n = i / 255;
-    const f = n * 0.90 + 0.05;
-    const s = f - 0.5;
-    const c = Math.max(0, Math.min(1, 0.5 + s * (1 + 0.22 * (1 - 4 * s * s))));
-    const v = c * 255;
-    R[i] = Math.max(0, Math.min(255, Math.round(v + 16)));
-    G[i] = Math.max(0, Math.min(255, Math.round(v + 5)));
-    B[i] = Math.max(0, Math.min(255, Math.round(v - 12 + (1 - n) * 6)));
-  }
-
-  for (let i = 0; i < d.length; i += 4) {
-    let r = R[d[i]];
-    let g = G[d[i + 1]];
-    let b = B[d[i + 2]];
-    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-    r = Math.round(r * 0.92 + lum * 0.08);
-    g = Math.round(g * 0.92 + lum * 0.08);
-    b = Math.round(b * 0.92 + lum * 0.08);
-    const grain = (Math.random() - 0.5) * 10;
-    d[i]     = Math.max(0, Math.min(255, r + grain));
-    d[i + 1] = Math.max(0, Math.min(255, g + grain * 0.88));
-    d[i + 2] = Math.max(0, Math.min(255, b + grain * 0.72));
-  }
-  ctx.putImageData(imageData, px, py);
-
-  const vig = ctx.createRadialGradient(
-    px + pw / 2, py + ph / 2, pw * 0.26,
-    px + pw / 2, py + ph / 2, pw * 0.70,
-  );
-  vig.addColorStop(0,    'rgba(0,0,0,0)');
-  vig.addColorStop(0.50, 'rgba(0,0,0,0.04)');
-  vig.addColorStop(1,    'rgba(0,0,0,0.52)');
-  ctx.fillStyle = vig;
-  ctx.fillRect(px, py, pw, ph);
-
-  const leak = ctx.createRadialGradient(
-    px + pw * 0.84, py + ph * 0.04, 0,
-    px + pw * 0.84, py + ph * 0.04, pw * 0.52,
-  );
-  leak.addColorStop(0,    'rgba(255,135,35,0.30)');
-  leak.addColorStop(0.38, 'rgba(255,80,12,0.10)');
-  leak.addColorStop(1,    'rgba(255,45,0,0)');
-  ctx.fillStyle = leak;
-  ctx.fillRect(px, py, pw, ph);
-}
 
 type Props = {
   onComplete:   (photos: string[]) => void;
@@ -74,6 +18,7 @@ type Props = {
   eventName?:   string;
   accentColor?: string;
   topOffset?:   string;
+  design?:      PolaroidDesign;
 };
 
 // Convert hex color to individual R,G,B values for mixing
@@ -91,7 +36,9 @@ export default function CameraCapture({
   eventName,
   accentColor = '#1E8BFF',
   topOffset   = 'pt-24',
+  design: designProp,
 }: Props) {
+  const d = { ...DEFAULT_DESIGN, ...designProp }; // merged design config
   const videoRef      = useRef<HTMLVideoElement>(null);
   const canvasRef     = useRef<HTMLCanvasElement>(null);
   const streamRef     = useRef<MediaStream | null>(null);
@@ -208,7 +155,7 @@ export default function CameraCapture({
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d')!;
 
-    ctx.fillStyle = '#FEFDF8';
+    ctx.fillStyle = d.frameColor;
     ctx.fillRect(0, 0, W, H);
 
     const pad = 20, img = W - pad * 2;
@@ -218,41 +165,41 @@ export default function CameraCapture({
     else             { sh = vw; sy = (vh - sh) / 2; }
     ctx.drawImage(video, sx, sy, sw, sh, pad, pad, img, img);
 
-    applyPolaroidFilter(ctx, pad, pad, img, img);
+    applyPolaroidFilter(ctx, pad, pad, img, img, d.filterStrength);
 
-    // ── Event name text watermark (large transparent text over photo) ──
-    if (eventName) {
+    // ── Event name watermark ──────────────────────────────────────────
+    if (d.watermark && eventName) {
       ctx.save();
       const wm     = eventName.toUpperCase();
       const wmSize = wm.length > 16 ? 28 : wm.length > 10 ? 34 : 40;
       ctx.font        = `900 ${wmSize}px Inter, ui-sans-serif, sans-serif`;
       ctx.textAlign   = 'center';
-      ctx.globalAlpha = 0.20;
-      ctx.fillStyle   = '#FFFFFF';
+      ctx.globalAlpha = d.watermarkOpacity / 100;
+      ctx.fillStyle   = d.watermarkColor;
       ctx.fillText(wm, W / 2, pad + img - 16, img - 40);
       ctx.restore();
     }
 
-    // ── Red Kodak-style date/time stamp ──────────────────────────────
-    const now = new Date();
-    const dd  = String(now.getDate()).padStart(2, '0');
-    const mm  = String(now.getMonth() + 1).padStart(2, '0');
-    const yy  = String(now.getFullYear()).slice(2);
-    const hh  = String(now.getHours()).padStart(2, '0');
-    const min = String(now.getMinutes()).padStart(2, '0');
-    const dateStamp = `${dd} ${mm} '${yy}`;
-    const timeStamp = `${hh}:${min}`;
+    // ── Date/time stamp ───────────────────────────────────────────────
+    if (d.dateStamp) {
+      const now = new Date();
+      const dd  = String(now.getDate()).padStart(2, '0');
+      const mm  = String(now.getMonth() + 1).padStart(2, '0');
+      const yy  = String(now.getFullYear()).slice(2);
+      const hh  = String(now.getHours()).padStart(2, '0');
+      const min = String(now.getMinutes()).padStart(2, '0');
+      const x   = d.dateStampPosition === 'right' ? pad + img - 10 : pad + 10;
 
-    ctx.save();
-    ctx.textAlign = 'left';
-    ctx.font = 'bold 17px "Courier New", monospace';
-    // Subtle glow to give it an embedded-in-film look
-    ctx.shadowColor = 'rgba(180,0,0,0.7)';
-    ctx.shadowBlur = 6;
-    ctx.fillStyle = '#E8192C';
-    ctx.fillText(dateStamp, pad + 10, pad + img - 22);
-    ctx.fillText(timeStamp, pad + 10, pad + img - 5);
-    ctx.restore();
+      ctx.save();
+      ctx.textAlign   = d.dateStampPosition === 'right' ? 'right' : 'left';
+      ctx.font        = 'bold 17px "Courier New", monospace';
+      ctx.shadowColor = 'rgba(0,0,0,0.4)';
+      ctx.shadowBlur  = 6;
+      ctx.fillStyle   = d.dateStampColor;
+      ctx.fillText(`${dd} ${mm} '${yy}`, x, pad + img - 22);
+      ctx.fillText(`${hh}:${min}`,       x, pad + img - 5);
+      ctx.restore();
+    }
 
     // ── Save interim (no label yet — added after note modal) ─────────
     const interimDataUrl = canvas.toDataURL('image/jpeg', 0.92);
@@ -285,8 +232,8 @@ export default function CameraCapture({
       img.src = interim;
     });
 
-    // Clear white label area and redraw with note + branding
-    ctx.fillStyle = '#FEFDF8';
+    // Clear label area and redraw
+    ctx.fillStyle = d.labelBg;
     ctx.fillRect(0, FRAME_SIZE, W, POLAROID_BTM);
 
     const noteClean = note.trim();
@@ -294,39 +241,49 @@ export default function CameraCapture({
       // Memory text — large handwriting font, hero of the label area
       const fontSize = noteClean.length > 26 ? 32 : noteClean.length > 16 ? 38 : 44;
       ctx.font       = `700 ${fontSize}px Caveat, var(--font-caveat), cursive`;
-      ctx.fillStyle  = '#2C1810';
+      ctx.fillStyle  = d.labelTextColor;
       ctx.textAlign  = 'center';
       ctx.fillText(noteClean, W / 2, FRAME_SIZE + 68, W - 48);
 
-      // Heart accent
-      ctx.font      = `700 20px Caveat, cursive`;
+      ctx.font      = '700 20px Caveat, cursive';
       ctx.fillStyle = '#C0392B';
       ctx.fillText('♥', W / 2, FRAME_SIZE + 98);
 
-      // Subtle event name at very bottom — small, not distracting
       ctx.font      = '500 10px Inter, ui-sans-serif, sans-serif';
       ctx.fillStyle = 'rgba(0,0,0,0.20)';
       ctx.textAlign = 'center';
       ctx.fillText((eventName ?? 'FestiDrop').toUpperCase(), W / 2, FRAME_SIZE + 136);
     } else {
-      // No note — show logo or event name prominently in center
+      // No note — show logo or event name based on design config
       const logoImg   = logoImgRef.current;
       const labelMidY = FRAME_SIZE + POLAROID_BTM / 2;
-      if (logoImg) {
-        const maxW = 220, maxH = 70;
-        const r  = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight, 1);
-        const lw = logoImg.naturalWidth * r, lh = logoImg.naturalHeight * r;
-        ctx.drawImage(logoImg, W / 2 - lw / 2, labelMidY - lh / 2, lw, lh);
-      } else if (eventName) {
-        ctx.font      = '700 22px Inter, ui-sans-serif, sans-serif';
-        ctx.fillStyle = '#2C1810';
-        ctx.textAlign = 'center';
-        ctx.fillText(eventName, W / 2, labelMidY + 8, W - 60);
-      } else {
-        ctx.font      = '700 15px Inter, ui-sans-serif, sans-serif';
-        ctx.fillStyle = '#8A94A6';
-        ctx.textAlign = 'center';
-        ctx.fillText('FestiDrop', W / 2, labelMidY + 6);
+
+      if (logoImg && d.logoPosition !== 'hidden') {
+        if (d.logoPosition === 'center') {
+          const maxW = 220, maxH = 70;
+          const r  = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight, 1);
+          const lw = logoImg.naturalWidth * r, lh = logoImg.naturalHeight * r;
+          ctx.drawImage(logoImg, W / 2 - lw / 2, labelMidY - lh / 2, lw, lh);
+        } else {
+          const maxW = 160, maxH = 40;
+          const r  = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight, 1);
+          const lw = logoImg.naturalWidth * r, lh = logoImg.naturalHeight * r;
+          ctx.globalAlpha = 0.65;
+          ctx.drawImage(logoImg, W / 2 - lw / 2, FRAME_SIZE + POLAROID_BTM - lh - 12, lw, lh);
+          ctx.globalAlpha = 1;
+        }
+      } else if (d.logoPosition !== 'hidden') {
+        if (eventName) {
+          ctx.font      = '700 22px Inter, ui-sans-serif, sans-serif';
+          ctx.fillStyle = d.labelTextColor;
+          ctx.textAlign = 'center';
+          ctx.fillText(eventName, W / 2, labelMidY + 8, W - 60);
+        } else {
+          ctx.font      = '700 15px Inter, ui-sans-serif, sans-serif';
+          ctx.fillStyle = '#8A94A6';
+          ctx.textAlign = 'center';
+          ctx.fillText('FestiDrop', W / 2, labelMidY + 6);
+        }
       }
     }
 

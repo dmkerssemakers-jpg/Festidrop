@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import CameraCapture from './CameraCapture';
+import type { PolaroidDesign } from '@/lib/polaroid-design';
 
 interface Props {
   eventId:      string;
@@ -11,9 +12,10 @@ interface Props {
   maxPhotos:    number;
   slug:         string;
   logoUrl?:     string | null;
+  design?:      PolaroidDesign;
 }
 
-export default function EventPhotoSession({ eventId, eventName, accentColor, slug, maxPhotos, logoUrl }: Props) {
+export default function EventPhotoSession({ eventId, eventName, accentColor, slug, maxPhotos, logoUrl, design }: Props) {
   const router = useRouter();
   const storageKey = `festidrop_photos_${slug}`;
   const [storageError, setStorageError] = useState(false);
@@ -52,6 +54,7 @@ export default function EventPhotoSession({ eventId, eventName, accentColor, slu
         eventName={eventName}
         accentColor={accentColor}
         topOffset="pt-24"
+        design={design}
       />
 
       {/* Storage error overlay */}

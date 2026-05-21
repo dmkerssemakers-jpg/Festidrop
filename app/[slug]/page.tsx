@@ -5,6 +5,7 @@ import Header from '@/components/Header';
 import EventPhotoSession from '@/components/EventPhotoSession';
 import EventSplash from '@/components/EventSplash';
 import AccessGate from '@/components/AccessGate';
+import { parseDesign } from '@/lib/polaroid-design';
 
 export default async function EventPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -76,6 +77,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         maxPhotos={event.maxPhotos}
         slug={slug}
         logoUrl={event.logoUrl}
+        design={parseDesign(event.designConfig)}
       />
     </main>
   );

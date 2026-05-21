@@ -2,6 +2,7 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import type { PolaroidDesign } from '@/lib/polaroid-design';
 
 // ── Slug helper ──────────────────────────────────────────────────────────────
 function toSlug(name: string): string {
@@ -81,6 +82,17 @@ export async function duplicateEvent(id: string) {
 
   revalidatePath('/admin/events');
   redirect(`/admin/events/${copy.id}`);
+}
+
+// ── Save polaroid design ─────────────────────────────────────────────────────
+export async function saveEventDesign(eventId: string, design: PolaroidDesign) {
+  await prisma.event.update({
+    where: { id: eventId },
+    data:  { designConfig: design },
+  });
+  revalidatePath(`/admin/events/${eventId}`);
+  revalidatePath(`/admin/events/${eventId}/designer`);
+  revalidatePath('/admin');
 }
 
 // ── Delete event ─────────────────────────────────────────────────────────────

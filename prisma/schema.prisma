@@ -17,9 +17,10 @@ model Event {
   emailText   String?
   maxPhotos   Int         @default(10)
   isActive    Boolean     @default(true)
-  accessCode  String?
-  endsAt      DateTime?
-  createdAt   DateTime    @default(now())
+  accessCode   String?
+  endsAt       DateTime?
+  designConfig Json?
+  createdAt    DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   drops       Drop[]
   whitelist   Whitelist[]

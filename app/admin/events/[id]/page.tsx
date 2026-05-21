@@ -92,6 +92,24 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
 
           {/* Quick actions */}
           <div className="flex items-center gap-2 shrink-0">
+            {/* Polaroid Designer */}
+            <Link
+              href={`/admin/events/${event.id}/designer`}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white transition-all hover:scale-105"
+              style={{
+                background: `linear-gradient(135deg, ${event.accentColor}, ${event.accentColor}BB)`,
+                boxShadow:  `0 4px 14px ${event.accentColor}35`,
+              }}
+              title="Open polaroid designer"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <rect x="1" y="1" width="10" height="10" rx="2" stroke="white" strokeWidth="1.2"/>
+                <rect x="2.5" y="2.5" width="7" height="5.5" rx="0.8" stroke="white" strokeWidth="1"/>
+                <path d="M4 10h4" stroke="white" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+              Designer
+            </Link>
+
             {/* Export CSV */}
             <a
               href={`/api/admin/events/${event.id}/export-drops`}
