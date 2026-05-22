@@ -126,6 +126,9 @@ function brandify(d: PolaroidDesign, accent: string): PolaroidDesign {
   };
 }
 
+// ── AI status type ────────────────────────────────────────────────────────────
+type AiStatus = 'idle' | 'analyzing' | 'generating' | 'done' | 'error';
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function PolaroidDesigner({
   eventId, eventName, accentColor, logoUrl, initialDesign,
@@ -134,14 +137,21 @@ export default function PolaroidDesigner({
   const logoImgRef  = useRef<HTMLImageElement | null>(null);
   const testImgRef  = useRef<HTMLImageElement | null>(null);
 
-  const [design,       setDesign]       = useState<PolaroidDesign>(initialDesign);
-  const [activeTheme,  setActiveTheme]  = useState<string | null>(null);
-  const [previewNote,  setPreviewNote]  = useState('Best night ever ♥');
-  const [showNote,     setShowNote]     = useState(false);
-  const [hasTestPhoto, setHasTestPhoto] = useState(false);
-  const [renderKey,    setRenderKey]    = useState(0);
-  const [isPending,    startTransition] = useTransition();
-  const [saveState,    setSaveState]    = useState<'idle' | 'saved' | 'error'>('idle');
+  const [design,        setDesign]        = useState<PolaroidDesign>(initialDesign);
+  const [activeTheme,   setActiveTheme]   = useState<string | null>(null);
+  const [previewNote,   setPreviewNote]   = useState('Best night ever ♥');
+  const [showNote,      setShowNote]      = useState(false);
+  const [hasTestPhoto,  setHasTestPhoto]  = useState(false);
+  const [renderKey,     setRenderKey]     = useState(0);
+  const [isPending,     startTransition]  = useTransition();
+  const [saveState,     setSaveState]     = useState<'idle' | 'saved' | 'error'>('idle');
+
+  // AI Brandbook state
+  const [aiFiles,       setAiFiles]       = useState<File[]>([]);
+  const [aiGenPhoto,    setAiGenPhoto]    = useState(true);
+  const [aiStatus,      setAiStatus]      = useState<AiStatus>('idle');
+  const [aiError,       setAiError]       = useState<string | null>(null);
+  const [aiBrandDesc,   setAiBrandDesc]   = useState<string | null>(null);
 
   // Load logo
   useEffect(() => {
@@ -175,6 +185,48 @@ export default function PolaroidDesigner({
   function applyTheme(theme: Theme) {
     setDesign(d => ({ ...DEFAULT_DESIGN, ...theme.design, labelTagline: d.labelTagline }));
     setActiveTheme(theme.id);
+  }
+
+  async function runBrandbookAnalysis() {
+    if (!aiFiles.length) return;
+    setAiStatus('analyzing');
+    setAiError(null);
+    setAiBrandDesc(null);
+
+    try {
+      const form = new FormData();
+      aiFiles.forEach(f => form.append('images', f));
+      form.append('eventName', eventName);
+      form.append('generatePhoto', String(aiGenPhoto));
+
+      if (aiGenPhoto) setAiStatus('generating');
+
+      const res  = await fetch('/api/admin/brandbook-analyze', { method: 'POST', body: form });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error ?? 'Onbekende fout');
+
+      // Apply generated design config
+      setDesign(d => ({ ...data.design, labelTagline: d.labelTagline }));
+      setActiveTheme(null);
+      setAiBrandDesc(data.brandDescription ?? null);
+
+      // Apply generated photo if present
+      if (data.photoBase64) {
+        const img = new Image();
+        img.onload = () => {
+          testImgRef.current = img;
+          setHasTestPhoto(true);
+          setRenderKey(k => k + 1);
+        };
+        img.src = `data:image/jpeg;base64,${data.photoBase64}`;
+      }
+
+      setAiStatus('done');
+    } catch (err: unknown) {
+      setAiError(err instanceof Error ? err.message : 'Fout bij AI analyse');
+      setAiStatus('error');
+    }
   }
 
   function applyBranding() {
@@ -301,6 +353,155 @@ export default function PolaroidDesigner({
           style={{ width: '316px', background: '#F4F6FA', borderRight: '1px solid rgba(0,0,0,0.07)' }}
         >
           <div className="p-4 space-y-2.5">
+
+            {/* ── 0. AI BRANDBOOK ──────────────────────────────────── */}
+            <div
+              className="rounded-xl overflow-hidden"
+              style={{
+                background: 'linear-gradient(135deg, #07162F, #0f2550)',
+                border: '1px solid rgba(30,139,255,0.25)',
+                boxShadow: '0 2px 12px rgba(7,22,47,0.15)',
+              }}
+            >
+              {/* Header */}
+              <div className="px-3.5 pt-3 pb-2 flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ background: 'rgba(30,139,255,0.2)', border: '1px solid rgba(30,139,255,0.3)' }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path d="M6 1l1.2 2.4 2.8.4-2 2 .5 2.8L6 7.4 3.5 8.6l.5-2.8-2-2 2.8-.4L6 1z" fill="#1E8BFF"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-xs font-black text-white leading-none">AI Brandbook Analyse</p>
+                  <p className="text-[9px] mt-0.5" style={{ color: 'rgba(189,239,255,0.45)' }}>
+                    Upload je brandbook → AI genereert het design
+                  </p>
+                </div>
+              </div>
+
+              {/* Upload area */}
+              <div className="px-3.5 pb-3 space-y-2">
+                <label
+                  className="flex flex-col items-center justify-center gap-1.5 rounded-xl cursor-pointer transition-all"
+                  style={{
+                    border: aiFiles.length
+                      ? '1.5px solid rgba(30,139,255,0.5)'
+                      : '1.5px dashed rgba(189,239,255,0.2)',
+                    background: aiFiles.length ? 'rgba(30,139,255,0.08)' : 'rgba(255,255,255,0.04)',
+                    padding: '10px',
+                    minHeight: '64px',
+                  }}
+                >
+                  {aiFiles.length ? (
+                    <div className="flex flex-wrap gap-1.5 justify-center">
+                      {aiFiles.map((f, i) => (
+                        <div key={i} className="flex items-center gap-1 px-2 py-1 rounded-lg"
+                          style={{ background: 'rgba(30,139,255,0.15)', border: '1px solid rgba(30,139,255,0.3)' }}>
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                            <rect x="1" y="1" width="8" height="8" rx="1.5" stroke="#1E8BFF" strokeWidth="1"/>
+                            <path d="M3 5h4M5 3v4" stroke="#1E8BFF" strokeWidth="1" strokeLinecap="round"/>
+                          </svg>
+                          <span className="text-[9px] font-bold text-white truncate max-w-[60px]">{f.name}</span>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={e => { e.preventDefault(); setAiFiles([]); setAiStatus('idle'); setAiError(null); }}
+                        className="text-[9px] font-bold px-2 py-1 rounded-lg"
+                        style={{ background: 'rgba(255,80,80,0.15)', color: 'rgba(255,140,140,0.9)' }}
+                      >
+                        × wis
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <rect x="2" y="2" width="16" height="16" rx="3" stroke="rgba(189,239,255,0.3)" strokeWidth="1.5"/>
+                        <path d="M7 10h6M10 7v6" stroke="rgba(189,239,255,0.3)" strokeWidth="1.5" strokeLinecap="round"/>
+                      </svg>
+                      <span className="text-[10px] font-bold text-center leading-tight"
+                        style={{ color: 'rgba(189,239,255,0.5)' }}>
+                        Upload logo of brandbook<br/>
+                        <span style={{ color: 'rgba(189,239,255,0.3)', fontWeight: 500 }}>PNG, JPG — max 4 afbeeldingen</span>
+                      </span>
+                    </>
+                  )}
+                  <input
+                    type="file" accept="image/*" multiple className="hidden"
+                    onChange={e => {
+                      const files = Array.from(e.target.files ?? []).slice(0, 4);
+                      setAiFiles(files);
+                      setAiStatus('idle');
+                      setAiError(null);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+
+                {/* Options row */}
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1.5 cursor-pointer flex-1">
+                    <button
+                      type="button"
+                      onClick={() => setAiGenPhoto(v => !v)}
+                      className="relative w-7 h-4 rounded-full transition-colors shrink-0"
+                      style={{ background: aiGenPhoto ? '#1E8BFF' : 'rgba(255,255,255,0.15)' }}
+                    >
+                      <div className="absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all"
+                        style={{ left: aiGenPhoto ? '14px' : '2px' }} />
+                    </button>
+                    <span className="text-[10px] font-semibold" style={{ color: 'rgba(189,239,255,0.6)' }}>
+                      Genereer sfeer-foto
+                    </span>
+                  </label>
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                    style={{ background: 'rgba(30,139,255,0.15)', color: 'rgba(189,239,255,0.5)' }}>
+                    {aiGenPhoto ? 'gpt-image-1' : 'alleen analyse'}
+                  </span>
+                </div>
+
+                {/* Run button */}
+                <button
+                  onClick={runBrandbookAnalysis}
+                  disabled={!aiFiles.length || aiStatus === 'analyzing' || aiStatus === 'generating'}
+                  className="w-full py-2.5 rounded-xl text-xs font-black text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40 flex items-center justify-center gap-2"
+                  style={{ background: 'linear-gradient(135deg, #1E8BFF, #0B4FD8)' }}
+                >
+                  {aiStatus === 'analyzing' ? (
+                    <><div className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    Analyseert brandbook...</>
+                  ) : aiStatus === 'generating' ? (
+                    <><div className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    Genereert sfeer-foto...</>
+                  ) : aiStatus === 'done' ? (
+                    <><svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 6l3.5 3.5 5-6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Design toegepast!</>
+                  ) : (
+                    <><svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M6 1l1.2 2.4 2.8.4-2 2 .5 2.8L6 7.4 3.5 8.6l.5-2.8-2-2 2.8-.4L6 1z" fill="white"/>
+                    </svg>
+                    Analyseer & genereer design</>
+                  )}
+                </button>
+
+                {/* Brand description result */}
+                {aiBrandDesc && aiStatus === 'done' && (
+                  <div className="rounded-lg px-3 py-2" style={{ background: 'rgba(0,200,150,0.1)', border: '1px solid rgba(0,200,150,0.2)' }}>
+                    <p className="text-[9px] font-bold mb-0.5" style={{ color: '#00C896' }}>Brand analyse:</p>
+                    <p className="text-[9px] leading-snug" style={{ color: 'rgba(189,239,255,0.6)' }}>{aiBrandDesc}</p>
+                  </div>
+                )}
+
+                {/* Error */}
+                {aiStatus === 'error' && aiError && (
+                  <div className="rounded-lg px-3 py-2" style={{ background: 'rgba(255,60,60,0.1)', border: '1px solid rgba(255,60,60,0.2)' }}>
+                    <p className="text-[9px] font-bold" style={{ color: '#FF6B6B' }}>{aiError}</p>
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* ── 1. THEMES ────────────────────────────────────────── */}
             <div
