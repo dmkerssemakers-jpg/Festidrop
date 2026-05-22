@@ -76,9 +76,22 @@ export async function POST(req: NextRequest) {
       })
     );
 
-    // ── Call Gemini ──────────────────────────────────────────────────────────
-    const result = await model.generateContent([...imageParts, DESIGN_PROMPT]);
-    const raw    = result.response.text().trim();
+    // ── Call Gemini (with retry on 503) ─────────────────────────────────────
+    let result;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        result = await model.generateContent([...imageParts, DESIGN_PROMPT]);
+        break;
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : '';
+        if (attempt < 3 && (msg.includes('503') || msg.includes('overloaded') || msg.includes('high demand'))) {
+          await new Promise(r => setTimeout(r, attempt * 2000));
+          continue;
+        }
+        throw e;
+      }
+    }
+    const raw = result!.response.text().trim();
 
     // Strip possible markdown code fences
     const cleaned = raw
