@@ -148,7 +148,6 @@ export default function PolaroidDesigner({
 
   // AI Brandbook state
   const [aiFiles,       setAiFiles]       = useState<File[]>([]);
-  const [aiGenPhoto,    setAiGenPhoto]    = useState(true);
   const [aiStatus,      setAiStatus]      = useState<AiStatus>('idle');
   const [aiError,       setAiError]       = useState<string | null>(null);
   const [aiBrandDesc,   setAiBrandDesc]   = useState<string | null>(null);
@@ -197,31 +196,15 @@ export default function PolaroidDesigner({
       const form = new FormData();
       aiFiles.forEach(f => form.append('images', f));
       form.append('eventName', eventName);
-      form.append('generatePhoto', String(aiGenPhoto));
-
-      if (aiGenPhoto) setAiStatus('generating');
 
       const res  = await fetch('/api/admin/brandbook-analyze', { method: 'POST', body: form });
       const data = await res.json();
 
       if (!res.ok) throw new Error(data.error ?? 'Onbekende fout');
 
-      // Apply generated design config
       setDesign(d => ({ ...data.design, labelTagline: d.labelTagline }));
       setActiveTheme(null);
       setAiBrandDesc(data.brandDescription ?? null);
-
-      // Apply generated photo if present
-      if (data.photoBase64) {
-        const img = new Image();
-        img.onload = () => {
-          testImgRef.current = img;
-          setHasTestPhoto(true);
-          setRenderKey(k => k + 1);
-        };
-        img.src = `data:image/jpeg;base64,${data.photoBase64}`;
-      }
-
       setAiStatus('done');
     } catch (err: unknown) {
       setAiError(err instanceof Error ? err.message : 'Fout bij AI analyse');
@@ -374,7 +357,7 @@ export default function PolaroidDesigner({
                 <div>
                   <p className="text-xs font-black text-white leading-none">AI Brandbook Analyse</p>
                   <p className="text-[9px] mt-0.5" style={{ color: 'rgba(189,239,255,0.45)' }}>
-                    Upload je brandbook → AI genereert het design
+                    Upload je brandbook → Gemini genereert het design
                   </p>
                 </div>
               </div>
@@ -438,41 +421,16 @@ export default function PolaroidDesigner({
                   />
                 </label>
 
-                {/* Options row */}
-                <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-1.5 cursor-pointer flex-1">
-                    <button
-                      type="button"
-                      onClick={() => setAiGenPhoto(v => !v)}
-                      className="relative w-7 h-4 rounded-full transition-colors shrink-0"
-                      style={{ background: aiGenPhoto ? '#1E8BFF' : 'rgba(255,255,255,0.15)' }}
-                    >
-                      <div className="absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all"
-                        style={{ left: aiGenPhoto ? '14px' : '2px' }} />
-                    </button>
-                    <span className="text-[10px] font-semibold" style={{ color: 'rgba(189,239,255,0.6)' }}>
-                      Genereer sfeer-foto
-                    </span>
-                  </label>
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
-                    style={{ background: 'rgba(30,139,255,0.15)', color: 'rgba(189,239,255,0.5)' }}>
-                    {aiGenPhoto ? 'gpt-image-1' : 'alleen analyse'}
-                  </span>
-                </div>
-
                 {/* Run button */}
                 <button
                   onClick={runBrandbookAnalysis}
-                  disabled={!aiFiles.length || aiStatus === 'analyzing' || aiStatus === 'generating'}
+                  disabled={!aiFiles.length || aiStatus === 'analyzing'}
                   className="w-full py-2.5 rounded-xl text-xs font-black text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40 flex items-center justify-center gap-2"
                   style={{ background: 'linear-gradient(135deg, #1E8BFF, #0B4FD8)' }}
                 >
                   {aiStatus === 'analyzing' ? (
                     <><div className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
                     Analyseert brandbook...</>
-                  ) : aiStatus === 'generating' ? (
-                    <><div className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                    Genereert sfeer-foto...</>
                   ) : aiStatus === 'done' ? (
                     <><svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                       <path d="M2 6l3.5 3.5 5-6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>

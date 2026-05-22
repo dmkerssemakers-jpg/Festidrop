@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: ['openai'],
+  serverExternalPackages: ['@google/generative-ai'],
 };
 export default nextConfig;
