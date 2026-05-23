@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardChart from './DashboardChart';
 import type { DayData } from './DashboardChart';
 
@@ -18,14 +18,6 @@ interface Props {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function maskEmail(email: string): string {
-  const at = email.indexOf('@');
-  if (at < 0) return email;
-  const local  = email.slice(0, at);
-  const domain = email.slice(at);
-  return `${local.slice(0, Math.min(4, local.length))}***${domain}`;
-}
 
 function formatDropDate(iso: string): string {
   const date = new Date(iso);
@@ -53,6 +45,7 @@ function formatDropDate(iso: string): string {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const PAGE = 15;
+type ResetStatus = 'idle' | 'loading' | 'done' | 'error';
 
 export default function EventStats({
   drops,
@@ -60,7 +53,17 @@ export default function EventStats({
   accentColor = '#1E8BFF',
   chartData,
 }: Props) {
-  const [visible, setVisible] = useState(PAGE);
+  const [visible,    setVisible]    = useState(PAGE);
+  const [search,     setSearch]     = useState('');
+  const [resetState, setResetState] = useState<Record<string, ResetStatus>>({});
+
+  // Reset pagination when search changes
+  useEffect(() => { setVisible(PAGE); }, [search]);
+
+  const q = search.trim().toLowerCase();
+  const filteredDrops = q
+    ? drops.filter(d => d.email.toLowerCase().includes(q))
+    : drops;
 
   const uniqueEmails = new Set(drops.map(d => d.email)).size;
 
@@ -72,8 +75,24 @@ export default function EventStats({
   const today    = drops.filter(d => new Date(d.sentAt) >= startToday).length;
   const lastWeek = drops.filter(d => new Date(d.sentAt) >= start7Days).length;
 
-  const visibleDrops = drops.slice(0, visible);
-  const hasMore      = visible < drops.length;
+  const visibleDrops = filteredDrops.slice(0, visible);
+  const hasMore      = visible < filteredDrops.length;
+
+  async function handleReset(drop: SerializedDrop) {
+    setResetState(prev => ({ ...prev, [drop.id]: 'loading' }));
+    try {
+      const res = await fetch('/api/admin/drops/reset-ratelimit', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ eventId: drop.eventId, email: drop.email }),
+      });
+      if (!res.ok) throw new Error('Mislukt');
+      setResetState(prev => ({ ...prev, [drop.id]: 'done' }));
+    } catch {
+      setResetState(prev => ({ ...prev, [drop.id]: 'error' }));
+    }
+    setTimeout(() => setResetState(prev => ({ ...prev, [drop.id]: 'idle' })), 2500);
+  }
 
   return (
     <div
@@ -135,10 +154,35 @@ export default function EventStats({
           </p>
           {drops.length > 0 && (
             <span className="text-[10px] text-muted">
-              {Math.min(visible, drops.length)} / {drops.length}
+              {q ? `${filteredDrops.length} / ${drops.length}` : `${Math.min(visible, drops.length)} / ${drops.length}`}
             </span>
           )}
         </div>
+
+        {/* Search */}
+        {drops.length > 0 && (
+          <div className="relative mb-3">
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+              width="12" height="12" viewBox="0 0 12 12" fill="none"
+            >
+              <circle cx="5" cy="5" r="4" stroke="#6C7A8D" strokeWidth="1.3"/>
+              <path d="M8.5 8.5l2 2" stroke="#6C7A8D" strokeWidth="1.3" strokeLinecap="round"/>
+            </svg>
+            <input
+              type="search"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Zoek op e-mail…"
+              className="w-full pl-8 pr-3 py-2 rounded-xl text-xs font-medium outline-none transition-colors"
+              style={{
+                background:   'rgba(247,251,255,0.8)',
+                border:       '1px solid rgba(189,239,255,0.6)',
+                color:        '#07162F',
+              }}
+            />
+          </div>
+        )}
 
         {drops.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 gap-2">
@@ -151,15 +195,18 @@ export default function EventStats({
             </div>
             <p className="text-xs text-muted">Nog geen drops voor dit event</p>
           </div>
+        ) : filteredDrops.length === 0 ? (
+          <p className="text-xs text-muted text-center py-6">Geen resultaten voor &quot;{search}&quot;</p>
         ) : (
           <>
             <div className="space-y-1">
               {visibleDrops.map(drop => {
-                const hue = drop.email.charCodeAt(0) * 137 % 360;
+                const hue    = drop.email.charCodeAt(0) * 137 % 360;
+                const status = resetState[drop.id] ?? 'idle';
                 return (
                   <div
                     key={drop.id}
-                    className="flex items-center gap-3 py-2 px-3 rounded-xl transition-colors hover:bg-white/60"
+                    className="flex items-center gap-3 py-2 px-3 rounded-xl transition-colors hover:bg-white/60 group"
                   >
                     <div
                       className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-black shrink-0"
@@ -167,12 +214,48 @@ export default function EventStats({
                     >
                       {drop.email[0].toUpperCase()}
                     </div>
-                    <p className="text-xs text-navy font-medium truncate flex-1">
-                      {maskEmail(drop.email)}
+                    <p className="text-xs text-navy font-medium truncate flex-1 select-all">
+                      {drop.email}
                     </p>
                     <p className="text-[10px] text-muted shrink-0 whitespace-nowrap">
                       {formatDropDate(drop.sentAt)}
                     </p>
+                    {/* Rate-limit reset button */}
+                    <button
+                      onClick={() => handleReset(drop)}
+                      disabled={status === 'loading'}
+                      title="Reset rate-limiet — persoon kan opnieuw verzenden"
+                      className="shrink-0 w-6 h-6 rounded-lg flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                      style={{
+                        background: status === 'done'  ? 'rgba(0,200,150,0.15)'
+                                  : status === 'error' ? 'rgba(255,30,30,0.1)'
+                                  : `${accentColor}15`,
+                        border: `1px solid ${
+                          status === 'done'  ? 'rgba(0,200,150,0.3)'
+                        : status === 'error' ? 'rgba(255,30,30,0.25)'
+                        : `${accentColor}30`}`,
+                      }}
+                    >
+                      {status === 'loading' ? (
+                        <span
+                          className="w-2.5 h-2.5 border border-t-transparent rounded-full animate-spin"
+                          style={{ borderColor: `${accentColor}60`, borderTopColor: 'transparent' }}
+                        />
+                      ) : status === 'done' ? (
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                          <path d="M2 5l2.5 2.5 4-4" stroke="#00C896" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      ) : status === 'error' ? (
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                          <path d="M2 2l6 6M8 2l-6 6" stroke="#FF3030" strokeWidth="1.5" strokeLinecap="round"/>
+                        </svg>
+                      ) : (
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                          <path d="M8.5 3A4 4 0 105 9" stroke={accentColor} strokeWidth="1.3" strokeLinecap="round"/>
+                          <path d="M7 1l1.5 2-2 1" stroke={accentColor} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </button>
                   </div>
                 );
               })}
@@ -184,7 +267,7 @@ export default function EventStats({
                 className="w-full mt-3 py-2 rounded-xl text-[11px] font-bold transition-all hover:opacity-80"
                 style={{ background: 'rgba(189,239,255,0.2)', color: '#6C7A8D' }}
               >
-                ↓ Meer laden ({drops.length - visible} resterend)
+                ↓ Meer laden ({filteredDrops.length - visible} resterend)
               </button>
             )}
           </>

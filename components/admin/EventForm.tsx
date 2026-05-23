@@ -21,7 +21,7 @@ const PHOTO_OPTIONS = [5, 8, 10, 12, 15, 20];
 const BASE_URL      = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://festidrop.vercel.app';
 
 interface Props {
-  event:    Event;
+  event:    Event & { notes?: string | null };
   eventUrl: string;
 }
 
@@ -441,6 +441,23 @@ export default function EventForm({ event, eventUrl }: Props) {
                 </div>
               </div>
             </div>
+          </div>
+
+          <div style={{ borderTop: '1px solid rgba(189,239,255,0.4)' }} />
+
+          {/* ── Sectie: Interne notities ─────────────────── */}
+          <div>
+            <p className="text-[9px] font-black uppercase tracking-[0.16em] mb-3"
+              style={{ color: 'rgba(108,122,141,0.6)' }}>Intern</p>
+            <Field label="Notities" hint="alleen zichtbaar voor jou in het dashboard">
+              <textarea
+                name="notes"
+                defaultValue={event.notes ?? ''}
+                placeholder="bijv. contactpersoon: Jan, locatie backstage ingang B…"
+                rows={3}
+                className="field resize-none"
+              />
+            </Field>
           </div>
 
           {/* ── Actions ──────────────────────────────────── */}

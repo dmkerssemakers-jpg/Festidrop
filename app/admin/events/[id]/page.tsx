@@ -184,6 +184,20 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
             })}
           </span>
         </div>
+
+        {/* Internal notes */}
+        {event.notes && (
+          <div
+            className="mt-3 pt-3 flex items-start gap-2"
+            style={{ borderTop: `1px solid ${event.accentColor}20` }}
+          >
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" className="shrink-0 mt-0.5">
+              <rect x="1" y="1" width="11" height="11" rx="2" stroke="#6C7A8D" strokeWidth="1.2"/>
+              <path d="M3.5 4.5h6M3.5 6.5h6M3.5 8.5h3.5" stroke="#6C7A8D" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+            <p className="text-xs text-muted leading-relaxed">{event.notes}</p>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">

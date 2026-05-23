@@ -44,10 +44,11 @@ export async function updateEvent(id: string, formData: FormData) {
   const accessCode = (formData.get('accessCode') as string | null)?.trim() || null;
   const endsAtRaw  = (formData.get('endsAt') as string | null)?.trim();
   const endsAt     = endsAtRaw ? new Date(endsAtRaw) : null;
+  const notes      = (formData.get('notes') as string | null)?.trim() || null;
 
   await prisma.event.update({
     where: { id },
-    data: { name, slug, accentColor, emailText, maxPhotos, isActive, logoUrl, accessCode, endsAt },
+    data: { name, slug, accentColor, emailText, maxPhotos, isActive, logoUrl, accessCode, endsAt, notes },
   });
 
   revalidatePath(`/admin/events/${id}`);

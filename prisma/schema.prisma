@@ -20,6 +20,7 @@ model Event {
   accessCode   String?
   endsAt       DateTime?
   designConfig Json?
+  notes        String?
   createdAt    DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   drops       Drop[]
