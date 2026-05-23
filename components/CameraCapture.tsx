@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ProgressStrip from './ProgressStrip';
 import { DEFAULT_DESIGN } from '@/lib/polaroid-design';
@@ -38,13 +38,17 @@ export default function CameraCapture({
   topOffset   = 'pt-24',
   design: designProp,
 }: Props) {
-  const d = { ...DEFAULT_DESIGN, ...designProp }; // merged design config
-  const videoRef      = useRef<HTMLVideoElement>(null);
-  const canvasRef     = useRef<HTMLCanvasElement>(null);
-  const streamRef     = useRef<MediaStream | null>(null);
-  const photosRef     = useRef<string[]>([]);
-  const logoImgRef    = useRef<HTMLImageElement | null>(null);
-  const onCompleteRef = useRef(onComplete);
+  // Memoize merged design so callbacks see a stable object reference
+  const d = useMemo(() => ({ ...DEFAULT_DESIGN, ...designProp }), [designProp]);
+
+  const videoRef            = useRef<HTMLVideoElement>(null);
+  const canvasRef           = useRef<HTMLCanvasElement>(null);
+  const streamRef           = useRef<MediaStream | null>(null);
+  const photosRef           = useRef<string[]>([]);
+  const logoImgRef          = useRef<HTMLImageElement | null>(null);
+  const onCompleteRef       = useRef(onComplete);
+  // Stable ref to finalizePolaroid — prevents shoot() from having a stale closure
+  const finalizePolaroidRef = useRef<((interim: string, isLast: boolean) => Promise<void>) | null>(null);
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
 
   // Pre-load logo
@@ -58,21 +62,36 @@ export default function CameraCapture({
   }, [logoUrl]);
 
   const [count,          setCount]          = useState(0);
+  const [thumbnails,     setThumbnails]     = useState<string[]>([]);
+  const [isLandscape,    setIsLandscape]    = useState(false);
   const [flashing,       setFlashing]       = useState(false);
   const [countdown,      setCountdown]      = useState<number | null>(null);
-  const [permission,     setPermission]     = useState<'idle' | 'requesting' | 'granted' | 'denied'>('idle');
+  // Start as 'requesting' — auto-start runs on mount, avoiding a 1-frame idle flicker
+  const [permission,     setPermission]     = useState<'idle' | 'requesting' | 'granted' | 'denied'>('requesting');
   const [deniedReason,   setDeniedReason]   = useState<'blocked' | 'unavailable'>('blocked');
   const [facingMode,     setFacingMode]     = useState<'environment' | 'user'>('environment');
   const [switching,      setSwitching]      = useState(false);
-  const [countdownSecs,  setCountdownSecs]  = useState<0 | 2 | 5>(2);
+  const [countdownSecs,  setCountdownSecs]  = useState<0 | 2 | 5>(0);
   const [finalizing,     setFinalizing]     = useState(false);
 
   const remaining  = maxPhotos - count;
   const isComplete = count >= maxPhotos;
+  // Derived: whether the shutter button should be interactive
+  const canShoot   = permission === 'granted' && !isComplete && countdown === null && !finalizing;
 
   // Derive a card background with a subtle tint of the accent color
   const [ar, ag, ab] = accentColor.startsWith('#') ? hexToRgb(accentColor) : [7, 22, 47];
   const cardBg = `rgba(${Math.round(7 + ar * 0.04)}, ${Math.round(22 + ag * 0.04)}, ${Math.round(47 + ab * 0.04)}, 0.92)`;
+
+  // Landscape orientation detection — only relevant on phones (max-height: 480px)
+  // Desktops are always landscape; this guard prevents blocking desktop users
+  useEffect(() => {
+    const mq  = window.matchMedia('(orientation: landscape) and (max-height: 480px)');
+    const upd = (e: MediaQueryList | MediaQueryListEvent) => setIsLandscape(e.matches);
+    upd(mq);
+    mq.addEventListener('change', upd as (e: MediaQueryListEvent) => void);
+    return () => mq.removeEventListener('change', upd as (e: MediaQueryListEvent) => void);
+  }, []);
 
   // ── Start camera ────────────────────────────────────────────────
   const startCamera = useCallback(async (mode: 'environment' | 'user' = 'environment') => {
@@ -85,9 +104,9 @@ export default function CameraCapture({
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        setPermission('granted');
-        setFacingMode(mode);
       }
+      setPermission('granted');
+      setFacingMode(mode);
     } catch (err: unknown) {
       const name = (err instanceof Error) ? err.name : '';
       setDeniedReason(name === 'NotFoundError' || name === 'OverconstrainedError' ? 'unavailable' : 'blocked');
@@ -120,22 +139,45 @@ export default function CameraCapture({
     }
   }, [permission, switching, flashing, facingMode, startCamera]);
 
-  useEffect(() => () => { streamRef.current?.getTracks().forEach(t => t.stop()); }, []);
-
-  // ── Auto-start camera on mount ───────────────────────────────────
-  const hasAutoStarted = useRef(false);
+  // ── Auto-start + cleanup in one effect so Strict Mode re-runs are safe ─────
+  // cancelled flag prevents a stale getUserMedia result from overwriting state
+  // after the effect cleanup has already stopped the stream.
   useEffect(() => {
-    if (!hasAutoStarted.current) {
-      hasAutoStarted.current = true;
-      startCamera();
-    }
-  }, [startCamera]);
+    let cancelled = false;
+
+    (async () => {
+      setPermission('requesting');
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 960 } },
+          audio: false,
+        });
+        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+        streamRef.current = stream;
+        if (videoRef.current) videoRef.current.srcObject = stream;
+        setPermission('granted');
+        setFacingMode('environment');
+      } catch (err: unknown) {
+        if (cancelled) return;
+        const name = (err instanceof Error) ? err.name : '';
+        setDeniedReason(name === 'NotFoundError' || name === 'OverconstrainedError' ? 'unavailable' : 'blocked');
+        setPermission('denied');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      streamRef.current?.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Delete last photo (undo) ─────────────────────────────────────
   const deleteLastPhoto = useCallback(() => {
     if (photosRef.current.length === 0) return;
     photosRef.current = photosRef.current.slice(0, -1);
     setCount(photosRef.current.length);
+    setThumbnails([...photosRef.current]);
   }, []);
 
   // ── Capture photo ────────────────────────────────────────────────
@@ -148,9 +190,15 @@ export default function CameraCapture({
     setFlashing(true);
     if (navigator.vibrate) navigator.vibrate(80);
 
+    try {
+    // Retina-aware canvas: scale up by devicePixelRatio for sharper exports
+    const dpr = window.devicePixelRatio || 1;
     const W = FRAME_SIZE, H = FRAME_SIZE + POLAROID_BTM;
-    canvas.width = W; canvas.height = H;
-    const ctx = canvas.getContext('2d')!;
+    canvas.width  = W * dpr;
+    canvas.height = H * dpr;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas 2D context niet beschikbaar');
+    ctx.scale(dpr, dpr); // all subsequent draws use logical px; canvas stores at physical px
 
     ctx.fillStyle = d.frameColor;
     ctx.fillRect(0, 0, W, H);
@@ -173,7 +221,6 @@ export default function CameraCapture({
       ctx.textAlign   = 'center';
       ctx.globalAlpha = d.watermarkOpacity / 100;
       ctx.fillStyle   = d.watermarkColor;
-      // Center of photo — stays clear of the bottom date stamp
       ctx.fillText(wm, W / 2, pad + Math.round(img * 0.52), img - 40);
       ctx.restore();
     }
@@ -204,20 +251,31 @@ export default function CameraCapture({
 
     setTimeout(() => {
       setFlashing(false);
-      finalizePolaroid(interimDataUrl, isLast);
+      // Use ref so finalizePolaroid is never stale even if d/eventName changed
+      finalizePolaroidRef.current?.(interimDataUrl, isLast);
     }, 160);
-  }, [isComplete, flashing, permission, maxPhotos]);
+    } catch (err) {
+      console.error('[shoot] canvas fout:', err);
+      setFlashing(false); // altijd deblokkeren zodat de knop bruikbaar blijft
+    }
+  }, [isComplete, flashing, permission, maxPhotos, d, eventName]);
 
   // ── Finalize polaroid — draw label immediately after shoot ──────────
   const finalizePolaroid = useCallback(async (interim: string, isLast: boolean) => {
     setFinalizing(true);
+    try {
     const canvas = canvasRef.current!;
     const ctx    = canvas.getContext('2d')!;
     const W      = FRAME_SIZE;
 
-    await new Promise<void>(resolve => {
+    await new Promise<void>((resolve, reject) => {
       const img = new Image();
-      img.onload = () => { ctx.drawImage(img, 0, 0); resolve(); };
+      img.onload = () => {
+        // Explicitly specify logical size so the retina-scaled context fills correctly
+        ctx.drawImage(img, 0, 0, FRAME_SIZE, FRAME_SIZE + POLAROID_BTM);
+        resolve();
+      };
+      img.onerror = () => reject(new Error('Tussenafbeelding laden mislukt'));
       img.src = interim;
     });
 
@@ -263,6 +321,7 @@ export default function CameraCapture({
     const finalDataUrl = canvas.toDataURL('image/jpeg', 0.88);
     photosRef.current = [...photosRef.current, finalDataUrl];
     setCount(photosRef.current.length);
+    setThumbnails([...photosRef.current]);
     setFinalizing(false);
 
     if (isLast) {
@@ -271,12 +330,20 @@ export default function CameraCapture({
       const allPhotos = photosRef.current.slice();
       setTimeout(() => onCompleteRef.current(allPhotos), 350);
     }
+    } catch (err) {
+      console.error('[finalizePolaroid] fout:', err);
+      setFinalizing(false); // altijd deblokkeren zodat de knop bruikbaar blijft
+    }
   }, [eventName, accentColor, d]);
+
+  // Keep the ref in sync with the latest finalizePolaroid closure
+  useEffect(() => { finalizePolaroidRef.current = finalizePolaroid; }, [finalizePolaroid]);
 
   // ── Countdown ────────────────────────────────────────────────────
   useEffect(() => {
     if (countdown === null) return;
     if (countdown === 0) { setCountdown(null); shoot(); return; }
+    if (navigator.vibrate) navigator.vibrate(40); // subtle haptic per countdown tick
     const t = setTimeout(() => setCountdown(c => c !== null ? c - 1 : null), 1000);
     return () => clearTimeout(t);
   }, [countdown, shoot]);
@@ -289,7 +356,6 @@ export default function CameraCapture({
       setCountdown(countdownSecs);
     }
   }, [isComplete, flashing, permission, countdown, countdownSecs, finalizing, shoot]);
-
 
   const statusText =
     count === 0       ? 'Richt de camera en druk op de knop 📸'
@@ -305,11 +371,11 @@ export default function CameraCapture({
         transition={{ duration: 0.65, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
         className="relative rounded-[28px] overflow-hidden"
         style={{
-          background:          cardBg,
-          border:              `1px solid ${accentColor}30`,
-          boxShadow:           `0 32px 80px rgba(7,22,47,0.30), 0 0 0 1px rgba(255,255,255,0.04), 0 0 60px ${accentColor}30`,
-          backdropFilter:      'blur(24px)',
-          WebkitBackdropFilter:'blur(24px)',
+          background:           cardBg,
+          border:               `1px solid ${accentColor}30`,
+          boxShadow:            `0 32px 80px rgba(7,22,47,0.30), 0 0 0 1px rgba(255,255,255,0.04), 0 0 60px ${accentColor}30`,
+          backdropFilter:       'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
         }}
       >
         {/* Flash overlay */}
@@ -375,7 +441,7 @@ export default function CameraCapture({
         <div className="mx-4 mt-4 rounded-2xl overflow-hidden aspect-square relative"
           style={{ background: '#000' }}>
 
-          {/* Permission: idle */}
+          {/* Permission: idle (shown only if auto-start is somehow skipped) */}
           {permission === 'idle' && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 p-6">
               <motion.div
@@ -474,8 +540,8 @@ export default function CameraCapture({
                 aria-label="Wissel camera"
                 className="absolute bottom-4 right-4 w-9 h-9 rounded-full flex items-center justify-center z-10 transition-all active:scale-90 disabled:opacity-40"
                 style={{
-                  background: 'rgba(7,22,47,0.55)',
-                  border: '1px solid rgba(255,255,255,0.15)',
+                  background:     'rgba(7,22,47,0.55)',
+                  border:         '1px solid rgba(255,255,255,0.15)',
                   backdropFilter: 'blur(8px)',
                 }}
               >
@@ -506,7 +572,7 @@ export default function CameraCapture({
                     key={countdown}
                     className="font-black text-white select-none"
                     style={{
-                      fontSize: '112px',
+                      fontSize:   '112px',
                       lineHeight: 1,
                       textShadow: `0 0 60px ${accentColor}80, 0 4px 32px rgba(0,0,0,0.7)`,
                     }}
@@ -521,6 +587,28 @@ export default function CameraCapture({
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Landscape warning */}
+          {isLandscape && permission === 'granted' && (
+            <div
+              className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-30"
+              style={{ background: 'rgba(7,22,47,0.90)', backdropFilter: 'blur(8px)' }}
+            >
+              <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+                <rect x="3" y="13" width="38" height="18" rx="5"
+                  stroke="white" strokeWidth="1.8" strokeOpacity="0.55"/>
+                <circle cx="22" cy="22" r="5"
+                  stroke="white" strokeWidth="1.6" strokeOpacity="0.55"/>
+                <path d="M36 17v-3l4 3-4 3v-3"
+                  stroke="white" strokeWidth="1.5" strokeLinecap="round"
+                  strokeLinejoin="round" strokeOpacity="0.4"/>
+              </svg>
+              <p className="text-white/75 text-sm font-bold">Draai je telefoon</p>
+              <p className="text-white/35 text-xs text-center px-10 leading-relaxed">
+                Houd je telefoon rechtop voor de beste polaroid-foto&apos;s
+              </p>
+            </div>
+          )}
 
           {/* Complete overlay */}
           {isComplete && (
@@ -543,6 +631,35 @@ export default function CameraCapture({
           )}
         </div>
 
+        {/* ── Photo thumbnails — horizontal scrollable strip ────── */}
+        {thumbnails.length > 0 && (
+          <div
+            className="mx-4 mt-3 flex gap-2 overflow-x-auto pb-0.5"
+            style={{ scrollbarWidth: 'none' }}
+          >
+            {thumbnails.map((src, i) => (
+              <div
+                key={i}
+                className="shrink-0 rounded-lg overflow-hidden"
+                style={{
+                  width:     44,
+                  height:    55,
+                  background: '#fff',
+                  padding:   '3px 3px 10px 3px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={src}
+                  alt={`Foto ${i + 1}`}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 3, display: 'block' }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* ── Stats + shutter ──────────────────────────────────── */}
         <div className="flex items-center justify-between px-6 mt-5 mb-2">
           <div>
@@ -553,23 +670,25 @@ export default function CameraCapture({
             </p>
           </div>
 
-          <motion.button
+          <button
+            type="button"
             onClick={handleShutterPress}
-            whileTap={(isComplete || permission !== 'granted' || countdown !== null || finalizing !== null) ? {} : { scale: 0.86 }}
-            disabled={isComplete || permission !== 'granted' || countdown !== null || finalizing !== null}
             aria-label="Maak foto"
-            className="w-[80px] h-[80px] rounded-full flex items-center justify-center focus:outline-none disabled:opacity-35 disabled:cursor-not-allowed"
+            className="w-[80px] h-[80px] rounded-full flex items-center justify-center focus:outline-none transition-transform active:scale-[0.86]"
             style={{
-              background: 'linear-gradient(145deg, #FF3838, #C00000)',
-              boxShadow:  permission === 'granted' && !isComplete
+              background:  'linear-gradient(145deg, #FF3838, #C00000)',
+              boxShadow:   canShoot
                 ? '0 12px 32px rgba(255,30,30,0.45), inset 0 1px 0 rgba(255,255,255,0.18)'
                 : '0 6px 16px rgba(255,30,30,0.2)',
+              opacity:     canShoot ? 1 : 0.35,
+              cursor:      canShoot ? 'pointer' : 'not-allowed',
+              transition:  'transform 0.1s, opacity 0.2s, box-shadow 0.2s',
             }}
           >
             <div className="w-[58px] h-[58px] rounded-full border-2 border-white/30 flex items-center justify-center">
               <div className="w-[40px] h-[40px] rounded-full bg-white/[0.15]" />
             </div>
-          </motion.button>
+          </button>
 
           <div className="text-right">
             <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/30 mb-0.5">Te gaan</p>

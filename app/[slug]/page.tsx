@@ -1,5 +1,7 @@
+import { cache } from 'react';
 import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import BackgroundPattern from '@/components/BackgroundPattern';
 import Header from '@/components/Header';
 import EventPhotoSession from '@/components/EventPhotoSession';
@@ -7,12 +9,46 @@ import EventSplash from '@/components/EventSplash';
 import AccessGate from '@/components/AccessGate';
 import { parseDesign } from '@/lib/polaroid-design';
 
+export const revalidate = 60;
+
+// Deduplicate the Prisma call — both generateMetadata and EventPage share this
+const getEvent = cache((slug: string) =>
+  prisma.event.findUnique({ where: { slug } })
+);
+
+export async function generateMetadata(
+  { params }: { params: Promise<{ slug: string }> },
+): Promise<Metadata> {
+  const { slug } = await params;
+  const event = await getEvent(slug);
+  if (!event || !event.isActive) return {};
+
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://festidrop.vercel.app';
+  const title   = `${event.name} — FestiDrop`;
+  const desc    = 'Maak gratis polaroid-foto\'s en ontvang ze direct per e-mail. 📸';
+
+  return {
+    title,
+    description: desc,
+    openGraph: {
+      title,
+      description: desc,
+      url:         `${baseUrl}/${slug}`,
+      siteName:    'FestiDrop',
+      type:        'website',
+    },
+    twitter: {
+      card:        'summary',
+      title,
+      description: desc,
+    },
+  };
+}
+
 export default async function EventPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
-  const event = await prisma.event.findUnique({
-    where: { slug },
-  });
+  const event = await getEvent(slug);
 
   if (!event || !event.isActive) notFound();
 
