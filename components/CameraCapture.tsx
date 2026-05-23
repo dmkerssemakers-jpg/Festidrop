@@ -48,7 +48,7 @@ export default function CameraCapture({
   const logoImgRef          = useRef<HTMLImageElement | null>(null);
   const onCompleteRef       = useRef(onComplete);
   // Stable ref to finalizePolaroid — prevents shoot() from having a stale closure
-  const finalizePolaroidRef = useRef<((interim: string, isLast: boolean) => Promise<void>) | null>(null);
+  const finalizePolaroidRef = useRef<((isLast: boolean) => Promise<void>) | null>(null);
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
 
   // Pre-load logo
@@ -191,14 +191,11 @@ export default function CameraCapture({
     if (navigator.vibrate) navigator.vibrate(80);
 
     try {
-    // Retina-aware canvas: scale up by devicePixelRatio for sharper exports
-    const dpr = window.devicePixelRatio || 1;
     const W = FRAME_SIZE, H = FRAME_SIZE + POLAROID_BTM;
-    canvas.width  = W * dpr;
-    canvas.height = H * dpr;
+    canvas.width  = W;
+    canvas.height = H;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas 2D context niet beschikbaar');
-    ctx.scale(dpr, dpr); // all subsequent draws use logical px; canvas stores at physical px
 
     ctx.fillStyle = d.frameColor;
     ctx.fillRect(0, 0, W, H);
@@ -246,13 +243,12 @@ export default function CameraCapture({
       ctx.restore();
     }
 
-    const interimDataUrl = canvas.toDataURL('image/jpeg', 0.92);
     const isLast = (photosRef.current.length + 1) >= maxPhotos;
 
     setTimeout(() => {
       setFlashing(false);
-      // Use ref so finalizePolaroid is never stale even if d/eventName changed
-      finalizePolaroidRef.current?.(interimDataUrl, isLast);
+      // Label is drawn directly on the existing canvas — no interim JPEG needed
+      finalizePolaroidRef.current?.(isLast);
     }, 160);
     } catch (err) {
       console.error('[shoot] canvas fout:', err);
@@ -260,24 +256,13 @@ export default function CameraCapture({
     }
   }, [isComplete, flashing, permission, maxPhotos, d, eventName]);
 
-  // ── Finalize polaroid — draw label immediately after shoot ──────────
-  const finalizePolaroid = useCallback(async (interim: string, isLast: boolean) => {
+  // ── Finalize polaroid — draw label on existing canvas, one JPEG encode ─────
+  const finalizePolaroid = useCallback(async (isLast: boolean) => {
     setFinalizing(true);
     try {
     const canvas = canvasRef.current!;
     const ctx    = canvas.getContext('2d')!;
     const W      = FRAME_SIZE;
-
-    await new Promise<void>((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        // Explicitly specify logical size so the retina-scaled context fills correctly
-        ctx.drawImage(img, 0, 0, FRAME_SIZE, FRAME_SIZE + POLAROID_BTM);
-        resolve();
-      };
-      img.onerror = () => reject(new Error('Tussenafbeelding laden mislukt'));
-      img.src = interim;
-    });
 
     // Draw label
     ctx.fillStyle = d.labelBg;
@@ -318,7 +303,7 @@ export default function CameraCapture({
       ctx.fillText(d.labelTagline.trim().toUpperCase(), W / 2, FRAME_SIZE + POLAROID_BTM - 10, W - 48);
     }
 
-    const finalDataUrl = canvas.toDataURL('image/jpeg', 0.88);
+    const finalDataUrl = canvas.toDataURL('image/jpeg', 0.95);
     photosRef.current = [...photosRef.current, finalDataUrl];
     setCount(photosRef.current.length);
     setThumbnails([...photosRef.current]);
@@ -334,7 +319,7 @@ export default function CameraCapture({
       console.error('[finalizePolaroid] fout:', err);
       setFinalizing(false); // altijd deblokkeren zodat de knop bruikbaar blijft
     }
-  }, [eventName, accentColor, d]);
+  }, [eventName, accentColor, d, maxPhotos]);
 
   // Keep the ref in sync with the latest finalizePolaroid closure
   useEffect(() => { finalizePolaroidRef.current = finalizePolaroid; }, [finalizePolaroid]);
