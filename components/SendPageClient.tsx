@@ -69,59 +69,113 @@ export default function SendPageClient({ slug, accentColor, eventName, logoUrl }
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
         >
-          {/* Stack area */}
-          <div className="relative w-48 h-56 mb-5">
+          {/* Secret photo stack */}
+          <div className="relative w-56 h-64 mb-6">
 
-            {/* Shadow blob behind stack */}
-            <div
-              className="absolute bottom-0 left-1/2 -translate-x-1/2 w-40 h-8 rounded-full blur-2xl"
-              style={{ background: `${accentColor}30` }}
+            {/* Deep glow behind stack */}
+            <motion.div
+              className="absolute bottom-0 left-1/2 -translate-x-1/2 w-52 h-16 rounded-full blur-3xl"
+              style={{ background: `${accentColor}50` }}
+              animate={{ opacity: [0.5, 0.9, 0.5], scale: [1, 1.08, 1] }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
             />
 
-            {/* Decorative blank polaroid stack — no photos shown (surprise UX) */}
+            {/* Polaroid frames — dark mystery style */}
             {[
-              { rotate: -11, y: 10,  x: -14, z: 1, delay: 0.05 },
-              { rotate:   7, y:  2,  x:  10, z: 2, delay: 0.12 },
-              { rotate:  -2, y: -8,  x:   0, z: 3, delay: 0.20 },
+              { rotate: -12, y: 12, x: -16, z: 1, delay: 0.05 },
+              { rotate:   8, y:  4, x:  14, z: 2, delay: 0.13 },
+              { rotate:  -2, y: -6, x:   0, z: 3, delay: 0.22 },
             ].map((s, i) => (
               <motion.div
                 key={i}
-                className="absolute rounded-lg overflow-hidden"
+                className="absolute rounded-xl overflow-hidden"
                 style={{
-                  width:  '136px',
-                  height: '168px',
-                  background: '#FEFDF8',
-                  left: '50%',
-                  top:  '50%',
-                  marginLeft: '-68px',
-                  marginTop:  '-84px',
+                  width:  '144px',
+                  height: '176px',
+                  left: '50%', top: '50%',
+                  marginLeft: '-72px', marginTop: '-88px',
                   zIndex: s.z,
-                  boxShadow: '0 10px 40px rgba(7,22,47,0.28), 0 2px 8px rgba(7,22,47,0.12)',
+                  background: '#0D1F3C',
+                  boxShadow: i === 2
+                    ? `0 20px 60px rgba(7,22,47,0.55), 0 0 0 1px rgba(255,255,255,0.06), 0 0 40px ${accentColor}30`
+                    : '0 12px 36px rgba(7,22,47,0.40), 0 0 0 1px rgba(255,255,255,0.04)',
                 }}
-                initial={{ opacity: 0, scale: 0.8, rotate: 0 }}
+                initial={{ opacity: 0, scale: 0.75, rotate: 0, y: 20 }}
                 animate={{ opacity: 1, scale: 1, rotate: s.rotate, x: s.x, y: s.y }}
-                transition={{ delay: s.delay, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ delay: s.delay, duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
               >
-                {/* Blurred photo area */}
+                {/* Scanline texture */}
                 <div
-                  className="absolute inset-0"
-                  style={{ bottom: '26px', background: 'linear-gradient(135deg, #d4d0c8 0%, #e8e4da 50%, #ccc8be 100%)' }}
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(255,255,255,0.015) 3px, rgba(255,255,255,0.015) 4px)',
+                    bottom: '28px',
+                  }}
                 />
-                {/* Polaroid label area */}
-                <div className="absolute bottom-0 left-0 right-0 h-7 bg-[#FEFDF8]" />
+                {/* Center lock icon — only on front card */}
+                {i === 2 && (
+                  <motion.div
+                    className="absolute flex flex-col items-center justify-center gap-2"
+                    style={{ inset: 0, bottom: '28px' }}
+                    animate={{ opacity: [0.7, 1, 0.7] }}
+                    transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+                  >
+                    <div
+                      className="w-11 h-11 rounded-full flex items-center justify-center"
+                      style={{
+                        background: `${accentColor}20`,
+                        border: `1.5px solid ${accentColor}50`,
+                        boxShadow: `0 0 24px ${accentColor}40`,
+                      }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                        <rect x="3" y="8" width="12" height="8" rx="2.5" stroke={accentColor} strokeWidth="1.5"/>
+                        <path d="M6 8V6a3 3 0 016 0v2" stroke={accentColor} strokeWidth="1.5" strokeLinecap="round"/>
+                        <circle cx="9" cy="12" r="1.2" fill={accentColor}/>
+                      </svg>
+                    </div>
+                    <p
+                      className="text-[8px] font-black uppercase tracking-[0.2em]"
+                      style={{ color: `${accentColor}80` }}
+                    >
+                      Verborgen
+                    </p>
+                  </motion.div>
+                )}
+                {/* Grain overlay */}
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    background: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\' opacity=\'0.04\'/%3E%3C/svg%3E")',
+                    backgroundSize: '160px',
+                    mixBlendMode: 'overlay',
+                    bottom: '28px',
+                  }}
+                />
+                {/* Polaroid label strip */}
+                <div
+                  className="absolute bottom-0 left-0 right-0 h-7 flex items-center justify-center"
+                  style={{ background: '#111D35', borderTop: '1px solid rgba(255,255,255,0.06)' }}
+                >
+                  {i === 2 && (
+                    <span className="text-[7px] font-black uppercase tracking-[0.22em]" style={{ color: `${accentColor}60` }}>
+                      ✦ festidrop
+                    </span>
+                  )}
+                </div>
               </motion.div>
             ))}
 
-            {/* Photo count badge */}
+            {/* Count badge */}
             <motion.div
-              className="absolute -top-2 -right-2 w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-sm z-20"
+              className="absolute -top-1 -right-1 w-11 h-11 rounded-full flex items-center justify-center text-white font-black text-sm z-20"
               style={{
-                background: `linear-gradient(135deg, ${accentColor}, ${accentColor}CC)`,
-                boxShadow:  `0 4px 16px ${accentColor}50`,
+                background: `linear-gradient(135deg, ${accentColor}, ${accentColor}BB)`,
+                boxShadow:  `0 4px 20px ${accentColor}60, 0 0 0 2px rgba(255,255,255,0.15)`,
               }}
-              initial={{ scale: 0, rotate: -20 }}
+              initial={{ scale: 0, rotate: -30 }}
               animate={{ scale: 1, rotate: 0 }}
-              transition={{ delay: 0.4, type: 'spring', stiffness: 420, damping: 18 }}
+              transition={{ delay: 0.45, type: 'spring', stiffness: 380, damping: 16 }}
             >
               {photos.length}
             </motion.div>
@@ -132,10 +186,13 @@ export default function SendPageClient({ slug, accentColor, eventName, logoUrl }
             className="text-center"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.38 }}
+            transition={{ delay: 0.42 }}
           >
-            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-muted">
+            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-muted">
               {photos.length} polaroid{photos.length !== 1 ? 's' : ''} vastgelegd ✦
+            </p>
+            <p className="text-[10px] mt-1" style={{ color: accentColor + '99' }}>
+              Vul je e-mail in om ze te ontvangen
             </p>
           </motion.div>
         </motion.div>
