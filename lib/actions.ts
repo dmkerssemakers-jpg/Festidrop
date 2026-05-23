@@ -158,6 +158,57 @@ export async function setEventClient(eventId: string, clientId: string | null) {
   revalidatePath(`/admin/events/${eventId}`);
 }
 
+// ── Invoice CRUD ─────────────────────────────────────────────────────────────
+export async function createInvoice(formData: FormData) {
+  const clientId = formData.get('clientId') as string;
+  const dueDate  = (formData.get('dueDate') as string) || null;
+  const notes    = (formData.get('notes') as string)?.trim() || null;
+  const vatPct   = parseFloat(formData.get('vatPct') as string) || 21;
+  const linesRaw = formData.get('lines') as string;
+  const lines    = JSON.parse(linesRaw) as { description: string; quantity: number; unitPrice: number }[];
+
+  const year = new Date().getFullYear();
+  const last = await prisma.invoice.findFirst({
+    where:   { number: { startsWith: `FD-${year}-` } },
+    orderBy: { number: 'desc' },
+  });
+  const seq    = last ? parseInt(last.number.split('-')[2]) + 1 : 1;
+  const number = `FD-${year}-${String(seq).padStart(3, '0')}`;
+
+  const invoice = await prisma.invoice.create({
+    data: {
+      number,
+      clientId,
+      dueDate: dueDate ? new Date(dueDate) : null,
+      notes,
+      vatPct,
+      lines: {
+        create: lines.map((l, i) => ({
+          description: l.description,
+          quantity:    l.quantity,
+          unitPrice:   l.unitPrice,
+          sortOrder:   i,
+        })),
+      },
+    },
+  });
+
+  revalidatePath('/admin/invoices');
+  redirect(`/admin/invoices/${invoice.id}`);
+}
+
+export async function updateInvoiceStatus(id: string, status: string) {
+  await prisma.invoice.update({ where: { id }, data: { status, updatedAt: new Date() } });
+  revalidatePath(`/admin/invoices/${id}`);
+  revalidatePath('/admin/invoices');
+}
+
+export async function deleteInvoice(id: string) {
+  await prisma.invoice.delete({ where: { id } });
+  revalidatePath('/admin/invoices');
+  redirect('/admin/invoices');
+}
+
 // ── Whitelist ────────────────────────────────────────────────────────────────
 export async function addWhitelist(eventId: string, email: string) {
   const normalized = email.trim().toLowerCase();

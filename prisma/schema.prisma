@@ -9,16 +9,17 @@ datasource db {
 }
 
 model Client {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   name          String
   contactPerson String?
   email         String?
   phone         String?
   website       String?
   notes         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   events        Event[]
+  invoices      Invoice[]
 }
 
 model Event {
@@ -57,4 +58,30 @@ model Whitelist {
   event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, email])
+}
+
+// status: CONCEPT | VERZONDEN | BETAALD | VERLOPEN | GEANNULEERD
+model Invoice {
+  id        String        @id @default(cuid())
+  number    String        @unique
+  clientId  String
+  client    Client        @relation(fields: [clientId], references: [id])
+  status    String        @default("CONCEPT")
+  issueDate DateTime      @default(now())
+  dueDate   DateTime?
+  notes     String?
+  vatPct    Float         @default(21)
+  lines     InvoiceLine[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model InvoiceLine {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Float   @default(1)
+  unitPrice   Float
+  sortOrder   Int     @default(0)
 }
