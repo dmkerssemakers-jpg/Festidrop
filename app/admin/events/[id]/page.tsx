@@ -6,44 +6,72 @@ import EventStats from '@/components/admin/EventStats';
 import WhitelistManager from '@/components/admin/WhitelistManager';
 import QrCodeCard from '@/components/admin/QrCodeCard';
 import DuplicateEventButton from '@/components/admin/DuplicateEventButton';
+import type { DayData } from '@/components/admin/DashboardChart';
+
+export const revalidate = 30;
 
 export default async function EditEventPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const [event, drops] = await Promise.all([
-    prisma.event.findUnique({
-      where: { id },
-      include: { whitelist: true },
+  const start7Days = new Date();
+  start7Days.setDate(start7Days.getDate() - 6);
+  start7Days.setHours(0, 0, 0, 0);
+
+  const [event, drops, chartDrops] = await Promise.all([
+    prisma.event.findUnique({ where: { id }, include: { whitelist: true } }),
+    prisma.drop.findMany({
+      where:   { eventId: id },
+      orderBy: { sentAt: 'desc' },
+      take:    100,
     }),
     prisma.drop.findMany({
-      where: { eventId: id },
-      orderBy: { sentAt: 'desc' },
-      take: 50,
+      where:  { eventId: id, sentAt: { gte: start7Days } },
+      select: { sentAt: true },
     }),
   ]);
 
   if (!event) notFound();
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://festidrop.vercel.app';
+  // Build 7-day chart data for this event
+  const dayLabels = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(start7Days);
+    d.setDate(start7Days.getDate() + i);
+    return d.toISOString().slice(0, 10);
+  });
+  const chartData: DayData[] = dayLabels.map(day => ({
+    label: new Date(`${day}T12:00:00`).toLocaleDateString('nl-NL', { weekday: 'short' }),
+    count: (chartDrops as Array<{ sentAt: Date }>).filter(
+      (d: { sentAt: Date }) => new Date(d.sentAt).toISOString().slice(0, 10) === day,
+    ).length,
+  }));
+
+  const baseUrl  = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://festidrop.vercel.app';
   const eventUrl = `${baseUrl}/${event.slug}`;
+
+  // Serialize drops (Date → ISO string) for client component
+  type RawDrop = (typeof drops)[number];
+  const serializedDrops = drops.map((d: RawDrop) => ({
+    id:      d.id,
+    email:   d.email,
+    sentAt:  d.sentAt.toISOString(),
+    eventId: d.eventId,
+  }));
 
   return (
     <div>
-      {/* ── Hero header ───────────────────────────────────────── */}
+      {/* ── Hero header ──────────────────────────────────────── */}
       <div
         className="rounded-2xl p-6 mb-8 relative overflow-hidden"
         style={{
           background: `linear-gradient(135deg, ${event.accentColor}18 0%, ${event.accentColor}06 100%)`,
-          border: `1px solid ${event.accentColor}30`,
+          border:     `1px solid ${event.accentColor}30`,
         }}
       >
-        {/* Decorative glow blob */}
         <div
           className="absolute -top-8 -right-8 w-40 h-40 rounded-full blur-3xl pointer-events-none"
           style={{ background: `${event.accentColor}20` }}
         />
 
-        {/* Back link */}
         <Link
           href="/admin/events"
           className="inline-flex items-center gap-1.5 text-xs font-bold text-muted hover:text-navy transition-colors mb-4"
@@ -56,12 +84,11 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
 
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            {/* Color dot */}
             <div
               className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-lg"
               style={{
                 background: `linear-gradient(135deg, ${event.accentColor}, ${event.accentColor}AA)`,
-                boxShadow: `0 6px 20px ${event.accentColor}40`,
+                boxShadow:  `0 6px 20px ${event.accentColor}40`,
               }}
             >
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -92,7 +119,6 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
 
           {/* Quick actions */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Polaroid Designer */}
             <Link
               href={`/admin/events/${event.id}/designer`}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white transition-all hover:scale-105"
@@ -100,7 +126,6 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
                 background: `linear-gradient(135deg, ${event.accentColor}, ${event.accentColor}BB)`,
                 boxShadow:  `0 4px 14px ${event.accentColor}35`,
               }}
-              title="Open polaroid designer"
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <rect x="1" y="1" width="10" height="10" rx="2" stroke="white" strokeWidth="1.2"/>
@@ -110,7 +135,6 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
               Designer
             </Link>
 
-            {/* Export CSV */}
             <a
               href={`/api/admin/events/${event.id}/export-drops`}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-navy transition-all hover:scale-105"
@@ -123,10 +147,8 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
               Export CSV
             </a>
 
-            {/* Duplicate */}
             <DuplicateEventButton eventId={event.id} />
 
-            {/* Open event */}
             <a
               href={eventUrl}
               target="_blank"
@@ -135,38 +157,46 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
               style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(189,239,255,0.5)' }}
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M5 2H2a1 1 0 00-1 1v7a1 1 0 001 1h7a1 1 0 001-1V7M8 1h3m0 0v3m0-3L5 6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M5 2H2a1 1 0 00-1 1v7a1 1 0 001 1h7a1 1 0 001-1V7M8 1h3m0 0v3m0-3L5 6"
+                  stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
               Open event
             </a>
           </div>
         </div>
 
-        {/* Mini meta row */}
+        {/* Meta row */}
         <div className="flex items-center gap-4 mt-4 pt-4" style={{ borderTop: `1px solid ${event.accentColor}20` }}>
           <span className="text-xs text-muted">
             <span className="font-bold text-navy">{drops.length}</span> drops
           </span>
           <span className="text-xs text-muted">
-            <span className="font-bold text-navy">{new Set(drops.map((d: { email: string }) => d.email)).size}</span> unieke e-mails
+            <span className="font-bold text-navy">
+              {new Set(drops.map((d: { email: string }) => d.email)).size}
+            </span> unieke e-mails
           </span>
           <span className="text-xs text-muted">
-            Max <span className="font-bold text-navy">{event.maxPhotos}</span> foto's per sessie
+            Max <span className="font-bold text-navy">{event.maxPhotos}</span> foto&apos;s per sessie
           </span>
           <span className="text-xs text-muted ml-auto">
-            Aangemaakt {new Date(event.createdAt).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
+            Aangemaakt {new Date(event.createdAt).toLocaleDateString('nl-NL', {
+              day: 'numeric', month: 'short', year: 'numeric',
+            })}
           </span>
         </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-        {/* Left column */}
         <div className="space-y-6">
-          <EventStats drops={drops} totalDrops={drops.length} accentColor={event.accentColor} />
-          <EventForm event={event} />
+          <EventStats
+            drops={serializedDrops}
+            totalDrops={drops.length}
+            accentColor={event.accentColor}
+            chartData={chartData}
+          />
+          <EventForm event={event} eventUrl={eventUrl} />
         </div>
 
-        {/* Right column */}
         <div className="space-y-6">
           <QrCodeCard slug={event.slug} baseUrl={baseUrl} accentColor={event.accentColor} />
           <WhitelistManager eventId={event.id} whitelist={event.whitelist} />

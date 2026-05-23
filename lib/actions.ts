@@ -127,3 +127,15 @@ export async function removeWhitelist(id: string, eventId: string) {
   await prisma.whitelist.delete({ where: { id } });
   revalidatePath(`/admin/events/${eventId}`);
 }
+
+export async function addWhitelistBulk(eventId: string, emails: string[]) {
+  const normalized = emails
+    .map(e => e.trim().toLowerCase())
+    .filter(e => e.includes('@') && e.includes('.'));
+  if (!normalized.length) return;
+  await prisma.whitelist.createMany({
+    data: normalized.map(email => ({ eventId, email })),
+    skipDuplicates: true,
+  });
+  revalidatePath(`/admin/events/${eventId}`);
+}
