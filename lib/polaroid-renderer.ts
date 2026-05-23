@@ -226,7 +226,6 @@ export interface RenderOptions {
   design:       PolaroidDesign;
   eventName?:   string;
   logoImg?:     HTMLImageElement | null;
-  noteText?:    string;
   photoEl?:     HTMLVideoElement | HTMLImageElement | null;
   sampleDate?:  Date;
   accentColor?: string;   // used by label style patterns
@@ -238,7 +237,6 @@ export async function renderPolaroid(
     design,
     eventName,
     logoImg      = null,
-    noteText     = '',
     photoEl      = null,
     sampleDate   = new Date(),
     accentColor  = '#1E8BFF',
@@ -313,77 +311,37 @@ export async function renderPolaroid(
   // ── Label style decoration ────────────────────────────────────────
   applyLabelStyle(ctx, design.labelStyle, accentColor, W);
 
-  // ── Label content ─────────────────────────────────────────────────
-  const noteClean = noteText.trim();
-  // Tagline takes space at the bottom — adjust content area accordingly
-  const hasTagline = design.labelTagline.trim().length > 0;
+  // ── Label content — logo or event name ───────────────────────────
+  const hasTagline    = design.labelTagline.trim().length > 0;
   const contentBottom = FRAME_SIZE + POLAROID_BTM - (hasTagline ? 22 : 10);
+  const usableH       = contentBottom - FRAME_SIZE;
+  const labelMidY     = FRAME_SIZE + usableH / 2;
 
-  if (noteClean) {
-    try {
-      if (typeof document !== 'undefined') await document.fonts.load('700 44px Caveat');
-    } catch { /* font fallback */ }
-
-    if (design.noteFont === 'uppercase') {
-      // Strak uppercase stijl
-      const fontSize = noteClean.length > 26 ? 13 : noteClean.length > 16 ? 16 : 19;
-      ctx.font      = `900 ${fontSize}px Inter, ui-sans-serif, sans-serif`;
-      ctx.fillStyle = design.labelTextColor;
-      ctx.textAlign = 'center';
-      ctx.fillText(noteClean.toUpperCase(), W / 2, FRAME_SIZE + 64, W - 60);
-      // Thin accent line below text
-      ctx.strokeStyle = accentColor;
-      ctx.lineWidth   = 2;
-      ctx.globalAlpha = 0.5;
-      ctx.beginPath();
-      ctx.moveTo(W / 2 - 40, FRAME_SIZE + 76);
-      ctx.lineTo(W / 2 + 40, FRAME_SIZE + 76);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
+  if (logoImg && design.logoPosition !== 'hidden') {
+    if (design.logoPosition === 'center') {
+      const maxW = 220, maxH = 64;
+      const r  = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight, 1);
+      const lw = logoImg.naturalWidth * r, lh = logoImg.naturalHeight * r;
+      ctx.drawImage(logoImg, W / 2 - lw / 2, labelMidY - lh / 2, lw, lh);
     } else {
-      // Handschrift stijl (Caveat)
-      const fontSize = noteClean.length > 26 ? 32 : noteClean.length > 16 ? 38 : 44;
-      ctx.font      = `700 ${fontSize}px Caveat, var(--font-caveat), cursive`;
+      const maxW = 160, maxH = 38;
+      const r  = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight, 1);
+      const lw = logoImg.naturalWidth * r, lh = logoImg.naturalHeight * r;
+      ctx.globalAlpha = 0.65;
+      ctx.drawImage(logoImg, W / 2 - lw / 2, contentBottom - lh - 4, lw, lh);
+      ctx.globalAlpha = 1;
+    }
+  } else if (design.logoPosition !== 'hidden') {
+    if (eventName) {
+      ctx.font      = '700 22px Inter, ui-sans-serif, sans-serif';
       ctx.fillStyle = design.labelTextColor;
       ctx.textAlign = 'center';
-      ctx.fillText(noteClean, W / 2, FRAME_SIZE + 68, W - 48);
-
-      ctx.font      = '700 18px Caveat, cursive';
-      ctx.fillStyle = '#C0392B';
-      ctx.fillText('♥', W / 2, FRAME_SIZE + 96);
-    }
-
-  } else {
-    // No note — logo or event name
-    const usableH  = contentBottom - FRAME_SIZE;
-    const labelMidY = FRAME_SIZE + usableH / 2;
-
-    if (logoImg && design.logoPosition !== 'hidden') {
-      if (design.logoPosition === 'center') {
-        const maxW = 220, maxH = 64;
-        const r  = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight, 1);
-        const lw = logoImg.naturalWidth * r, lh = logoImg.naturalHeight * r;
-        ctx.drawImage(logoImg, W / 2 - lw / 2, labelMidY - lh / 2, lw, lh);
-      } else {
-        const maxW = 160, maxH = 38;
-        const r  = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight, 1);
-        const lw = logoImg.naturalWidth * r, lh = logoImg.naturalHeight * r;
-        ctx.globalAlpha = 0.65;
-        ctx.drawImage(logoImg, W / 2 - lw / 2, contentBottom - lh - 4, lw, lh);
-        ctx.globalAlpha = 1;
-      }
-    } else if (design.logoPosition !== 'hidden') {
-      if (eventName) {
-        ctx.font      = '700 22px Inter, ui-sans-serif, sans-serif';
-        ctx.fillStyle = design.labelTextColor;
-        ctx.textAlign = 'center';
-        ctx.fillText(eventName, W / 2, labelMidY + 8, W - 60);
-      } else {
-        ctx.font      = '700 15px Inter, ui-sans-serif, sans-serif';
-        ctx.fillStyle = '#8A94A6';
-        ctx.textAlign = 'center';
-        ctx.fillText('FestiDrop', W / 2, labelMidY + 6);
-      }
+      ctx.fillText(eventName, W / 2, labelMidY + 8, W - 60);
+    } else {
+      ctx.font      = '700 15px Inter, ui-sans-serif, sans-serif';
+      ctx.fillStyle = '#8A94A6';
+      ctx.textAlign = 'center';
+      ctx.fillText('FestiDrop', W / 2, labelMidY + 6);
     }
   }
 

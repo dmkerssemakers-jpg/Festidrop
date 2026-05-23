@@ -65,10 +65,7 @@ export default function CameraCapture({
   const [facingMode,     setFacingMode]     = useState<'environment' | 'user'>('environment');
   const [switching,      setSwitching]      = useState(false);
   const [countdownSecs,  setCountdownSecs]  = useState<0 | 2 | 5>(2);
-  // Memory note modal
-  const [pendingPhoto,   setPendingPhoto]   = useState<string | null>(null);
-  const [noteText,       setNoteText]       = useState('');
-  const pendingIsLastRef = useRef(false);
+  const [finalizing,     setFinalizing]     = useState(false);
 
   const remaining  = maxPhotos - count;
   const isComplete = count >= maxPhotos;
@@ -202,105 +199,61 @@ export default function CameraCapture({
       ctx.restore();
     }
 
-    // ── Save interim (no label yet — added after note modal) ─────────
     const interimDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    const isLast = (photosRef.current.length + 1) >= maxPhotos;
 
     setTimeout(() => {
       setFlashing(false);
-      pendingIsLastRef.current = (photosRef.current.length + 1) >= maxPhotos;
-      setPendingPhoto(interimDataUrl);
+      finalizePolaroid(interimDataUrl, isLast);
     }, 160);
   }, [isComplete, flashing, permission, maxPhotos]);
 
-  // ── Finalize polaroid (after note modal) ─────────────────────────
-  const finalizePolaroid = useCallback(async (note: string) => {
-    const interim = pendingPhoto;
-    if (!interim) return;
-    setPendingPhoto(null);
-    setNoteText('');
-
-    // Ensure Caveat is loaded for canvas use
-    try { await document.fonts.load('700 24px Caveat'); } catch { /* use fallback */ }
-
+  // ── Finalize polaroid — draw label immediately after shoot ──────────
+  const finalizePolaroid = useCallback(async (interim: string, isLast: boolean) => {
+    setFinalizing(true);
     const canvas = canvasRef.current!;
     const ctx    = canvas.getContext('2d')!;
     const W      = FRAME_SIZE;
 
-    // Load interim image back onto canvas
     await new Promise<void>(resolve => {
       const img = new Image();
       img.onload = () => { ctx.drawImage(img, 0, 0); resolve(); };
       img.src = interim;
     });
 
-    // Clear label area and redraw
+    // Draw label
     ctx.fillStyle = d.labelBg;
     ctx.fillRect(0, FRAME_SIZE, W, POLAROID_BTM);
     applyLabelStyle(ctx, d.labelStyle, accentColor, W);
 
-    const noteClean = note.trim();
-    if (noteClean) {
-      // Memory text
-      if (d.noteFont === 'uppercase') {
-        const fontSize = noteClean.length > 26 ? 13 : noteClean.length > 16 ? 16 : 19;
-        ctx.font      = `900 ${fontSize}px Inter, ui-sans-serif, sans-serif`;
-        ctx.fillStyle = d.labelTextColor;
-        ctx.textAlign = 'center';
-        ctx.fillText(noteClean.toUpperCase(), W / 2, FRAME_SIZE + 64, W - 60);
-        ctx.strokeStyle = accentColor;
-        ctx.lineWidth   = 2;
-        ctx.globalAlpha = 0.5;
-        ctx.beginPath();
-        ctx.moveTo(W / 2 - 40, FRAME_SIZE + 76);
-        ctx.lineTo(W / 2 + 40, FRAME_SIZE + 76);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      } else {
-        const fontSize = noteClean.length > 26 ? 32 : noteClean.length > 16 ? 38 : 44;
-        ctx.font      = `700 ${fontSize}px Caveat, var(--font-caveat), cursive`;
-        ctx.fillStyle = d.labelTextColor;
-        ctx.textAlign = 'center';
-        ctx.fillText(noteClean, W / 2, FRAME_SIZE + 68, W - 48);
-        ctx.font      = '700 18px Caveat, cursive';
-        ctx.fillStyle = '#C0392B';
-        ctx.fillText('♥', W / 2, FRAME_SIZE + 96);
-      }
-    } else {
-      // No note — show logo or event name based on design config
-      const logoImg   = logoImgRef.current;
-      const labelMidY = FRAME_SIZE + POLAROID_BTM / 2;
+    // Logo or event name
+    const logoImg    = logoImgRef.current;
+    const hasTagline = d.labelTagline.trim().length > 0;
+    const contentBot = FRAME_SIZE + POLAROID_BTM - (hasTagline ? 22 : 10);
+    const labelMidY  = FRAME_SIZE + (contentBot - FRAME_SIZE) / 2;
 
-      if (logoImg && d.logoPosition !== 'hidden') {
-        if (d.logoPosition === 'center') {
-          const maxW = 220, maxH = 70;
-          const r  = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight, 1);
-          const lw = logoImg.naturalWidth * r, lh = logoImg.naturalHeight * r;
-          ctx.drawImage(logoImg, W / 2 - lw / 2, labelMidY - lh / 2, lw, lh);
-        } else {
-          const maxW = 160, maxH = 40;
-          const r  = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight, 1);
-          const lw = logoImg.naturalWidth * r, lh = logoImg.naturalHeight * r;
-          ctx.globalAlpha = 0.65;
-          ctx.drawImage(logoImg, W / 2 - lw / 2, FRAME_SIZE + POLAROID_BTM - lh - 12, lw, lh);
-          ctx.globalAlpha = 1;
-        }
-      } else if (d.logoPosition !== 'hidden') {
-        if (eventName) {
-          ctx.font      = '700 22px Inter, ui-sans-serif, sans-serif';
-          ctx.fillStyle = d.labelTextColor;
-          ctx.textAlign = 'center';
-          ctx.fillText(eventName, W / 2, labelMidY + 8, W - 60);
-        } else {
-          ctx.font      = '700 15px Inter, ui-sans-serif, sans-serif';
-          ctx.fillStyle = '#8A94A6';
-          ctx.textAlign = 'center';
-          ctx.fillText('FestiDrop', W / 2, labelMidY + 6);
-        }
+    if (logoImg && d.logoPosition !== 'hidden') {
+      if (d.logoPosition === 'center') {
+        const maxW = 220, maxH = 70;
+        const r  = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight, 1);
+        const lw = logoImg.naturalWidth * r, lh = logoImg.naturalHeight * r;
+        ctx.drawImage(logoImg, W / 2 - lw / 2, labelMidY - lh / 2, lw, lh);
+      } else {
+        const maxW = 160, maxH = 40;
+        const r  = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight, 1);
+        const lw = logoImg.naturalWidth * r, lh = logoImg.naturalHeight * r;
+        ctx.globalAlpha = 0.65;
+        ctx.drawImage(logoImg, W / 2 - lw / 2, contentBot - lh - 4, lw, lh);
+        ctx.globalAlpha = 1;
       }
+    } else if (d.logoPosition !== 'hidden') {
+      ctx.font      = '700 22px Inter, ui-sans-serif, sans-serif';
+      ctx.fillStyle = d.labelTextColor;
+      ctx.textAlign = 'center';
+      ctx.fillText(eventName ?? 'FestiDrop', W / 2, labelMidY + 8, W - 60);
     }
 
-    // Tagline at very bottom of label
-    if (d.labelTagline.trim()) {
+    if (hasTagline) {
       ctx.font      = '600 10px Inter, ui-sans-serif, sans-serif';
       ctx.fillStyle = 'rgba(0,0,0,0.35)';
       ctx.textAlign = 'center';
@@ -309,16 +262,16 @@ export default function CameraCapture({
 
     const finalDataUrl = canvas.toDataURL('image/jpeg', 0.88);
     photosRef.current = [...photosRef.current, finalDataUrl];
-    const nextCount = photosRef.current.length;
-    setCount(nextCount);
+    setCount(photosRef.current.length);
+    setFinalizing(false);
 
-    if (pendingIsLastRef.current) {
+    if (isLast) {
       streamRef.current?.getTracks().forEach(t => t.stop());
       streamRef.current = null;
       const allPhotos = photosRef.current.slice();
       setTimeout(() => onCompleteRef.current(allPhotos), 350);
     }
-  }, [pendingPhoto, eventName]);
+  }, [eventName, accentColor, d]);
 
   // ── Countdown ────────────────────────────────────────────────────
   useEffect(() => {
@@ -329,13 +282,14 @@ export default function CameraCapture({
   }, [countdown, shoot]);
 
   const handleShutterPress = useCallback(() => {
-    if (isComplete || flashing || permission !== 'granted' || countdown !== null || pendingPhoto !== null) return;
+    if (isComplete || flashing || permission !== 'granted' || countdown !== null || finalizing) return;
     if (countdownSecs === 0) {
       shoot();
     } else {
       setCountdown(countdownSecs);
     }
-  }, [isComplete, flashing, permission, countdown, countdownSecs, pendingPhoto, shoot]);
+  }, [isComplete, flashing, permission, countdown, countdownSecs, finalizing, shoot]);
+
 
   const statusText =
     count === 0       ? 'Richt de camera en druk op de knop 📸'
@@ -601,8 +555,8 @@ export default function CameraCapture({
 
           <motion.button
             onClick={handleShutterPress}
-            whileTap={(isComplete || permission !== 'granted' || countdown !== null || pendingPhoto !== null) ? {} : { scale: 0.86 }}
-            disabled={isComplete || permission !== 'granted' || countdown !== null || pendingPhoto !== null}
+            whileTap={(isComplete || permission !== 'granted' || countdown !== null || finalizing !== null) ? {} : { scale: 0.86 }}
+            disabled={isComplete || permission !== 'granted' || countdown !== null || finalizing !== null}
             aria-label="Maak foto"
             className="w-[80px] h-[80px] rounded-full flex items-center justify-center focus:outline-none disabled:opacity-35 disabled:cursor-not-allowed"
             style={{
@@ -696,135 +650,6 @@ export default function CameraCapture({
         <canvas ref={canvasRef} className="hidden" aria-hidden />
       </motion.div>
 
-      {/* ── Memory note modal ─────────────────────────────────────── */}
-      <AnimatePresence>
-        {pendingPhoto && (
-          <motion.div
-            key="note-modal"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[150] flex items-end justify-center"
-            style={{ background: 'rgba(7,22,47,0.70)', backdropFilter: 'blur(8px)' }}
-          >
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', stiffness: 340, damping: 34 }}
-              className="w-full max-w-md rounded-t-[32px] overflow-hidden"
-              style={{
-                background:   'rgba(14,26,52,0.97)',
-                border:       `1px solid ${accentColor}25`,
-                borderBottom: 'none',
-                boxShadow:    `0 -24px 60px rgba(7,22,47,0.5), 0 0 40px ${accentColor}18`,
-              }}
-            >
-              {/* Top accent line */}
-              <div className="h-px w-full"
-                style={{ background: `linear-gradient(90deg, transparent, ${accentColor}60, transparent)` }} />
-
-              {/* Handle bar */}
-              <div className="flex justify-center pt-3 pb-1">
-                <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
-              </div>
-
-              <div className="px-6 pb-8 pt-2">
-                {/* Header with thumbnail */}
-                <div className="flex items-center gap-4 mb-5">
-                  {/* Photo thumbnail */}
-                  <div className="rounded-xl overflow-hidden shrink-0"
-                    style={{ width: 52, height: 64, background: '#FEFDF8', boxShadow: '0 4px 16px rgba(7,22,47,0.4)' }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={pendingPhoto} alt="" className="w-full object-cover"
-                      style={{ height: 'calc(100% - 11px)' }} />
-                    <div className="h-[11px] bg-[#FEFDF8]" />
-                  </div>
-                  <div>
-                    <p className="text-white font-black text-base" style={{ letterSpacing: '-0.02em' }}>
-                      Voeg een herinnering toe
-                    </p>
-                    <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>
-                      Verschijnt op je polaroid
-                    </p>
-                  </div>
-                </div>
-
-                {/* Text input with handwriting font preview */}
-                <div className="relative mb-3">
-                  <textarea
-                    value={noteText}
-                    onChange={e => setNoteText(e.target.value.slice(0, 40))}
-                    placeholder="Best night ever ♥"
-                    rows={2}
-                    autoFocus
-                    className="w-full px-4 py-3 rounded-2xl resize-none focus:outline-none transition-all"
-                    style={{
-                      background:  'rgba(255,255,255,0.06)',
-                      border:      `1px solid ${noteText ? accentColor + '50' : 'rgba(255,255,255,0.10)'}`,
-                      color:       '#fff',
-                      fontSize:    '22px',
-                      lineHeight:  1.3,
-                      fontFamily:  'var(--font-caveat), Caveat, cursive',
-                      caretColor:  accentColor,
-                    }}
-                  />
-                  {/* Character counter */}
-                  <span
-                    className="absolute bottom-2.5 right-3 text-[10px] font-bold tabular-nums"
-                    style={{ color: noteText.length > 35 ? '#FF6B35' : 'rgba(255,255,255,0.22)' }}
-                  >
-                    {noteText.length}/40
-                  </span>
-                </div>
-
-                {/* Quick emoji / symbols bar */}
-                <div className="flex gap-2 mb-5 flex-wrap">
-                  {['♥', '✦', '🎵', '🎉', '📸', '⚡', '🌙', '✌️'].map(emoji => (
-                    <button
-                      key={emoji}
-                      onClick={() => setNoteText(t => (t + emoji).slice(0, 40))}
-                      className="w-9 h-9 rounded-xl flex items-center justify-center text-base transition-all hover:scale-110 active:scale-90"
-                      style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.08)' }}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Action buttons */}
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => finalizePolaroid('')}
-                    className="flex-1 py-3.5 rounded-full text-sm font-bold transition-all hover:opacity-80"
-                    style={{
-                      background: 'rgba(255,255,255,0.06)',
-                      border:     '1px solid rgba(255,255,255,0.10)',
-                      color:      'rgba(255,255,255,0.45)',
-                    }}
-                  >
-                    Sla over
-                  </button>
-                  <motion.button
-                    onClick={() => finalizePolaroid(noteText)}
-                    whileTap={{ scale: 0.97 }}
-                    className="flex-[2] py-3.5 rounded-full text-sm font-black text-white transition-all flex items-center justify-center gap-2"
-                    style={{
-                      background: `linear-gradient(135deg, ${accentColor}, ${accentColor}CC)`,
-                      boxShadow:  `0 8px 24px ${accentColor}45`,
-                    }}
-                  >
-                    <span style={{ fontFamily: 'var(--font-caveat), cursive', fontSize: '18px' }}>
-                      {noteText.trim() ? `"${noteText.trim().slice(0, 12)}${noteText.length > 12 ? '…' : ''}"` : 'Bewaar'}
-                    </span>
-                    ♥
-                  </motion.button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </section>
   );
 }

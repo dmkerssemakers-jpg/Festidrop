@@ -35,7 +35,7 @@ const THEMES: Theme[] = [
     name: 'Kodak',
     design: {
       frameColor: '#FEFDF8', labelBg: '#FEFDF8', labelTextColor: '#2C1810',
-      labelStyle: 'solid', noteFont: 'caveat',
+      labelStyle: 'solid',
       dateStamp: true, dateStampColor: '#E8192C', dateStampPosition: 'left',
       watermark: true, watermarkOpacity: 20, watermarkColor: '#FFFFFF',
       filterStrength: 85, logoPosition: 'center',
@@ -47,7 +47,7 @@ const THEMES: Theme[] = [
     name: 'Dark',
     design: {
       frameColor: '#111111', labelBg: '#1A1A2E', labelTextColor: '#EEEEEE',
-      labelStyle: 'accent-line', noteFont: 'uppercase',
+      labelStyle: 'accent-line',
       dateStamp: true, dateStampColor: '#FF3A5C', dateStampPosition: 'right',
       watermark: true, watermarkOpacity: 15, watermarkColor: '#FFFFFF',
       filterStrength: 50, logoPosition: 'center',
@@ -59,7 +59,7 @@ const THEMES: Theme[] = [
     name: 'Minimal',
     design: {
       frameColor: '#FFFFFF', labelBg: '#FFFFFF', labelTextColor: '#07162F',
-      labelStyle: 'solid', noteFont: 'uppercase',
+      labelStyle: 'solid',
       dateStamp: false, dateStampColor: '#07162F', dateStampPosition: 'left',
       watermark: false, watermarkOpacity: 10, watermarkColor: '#000000',
       filterStrength: 0, logoPosition: 'center',
@@ -71,7 +71,7 @@ const THEMES: Theme[] = [
     name: 'Warm Film',
     design: {
       frameColor: '#F5F0E8', labelBg: '#F5F0E8', labelTextColor: '#3D2B1F',
-      labelStyle: 'grain', noteFont: 'caveat',
+      labelStyle: 'grain',
       dateStamp: true, dateStampColor: '#C07030', dateStampPosition: 'left',
       watermark: false, watermarkOpacity: 15, watermarkColor: '#FFFFFF',
       filterStrength: 100, logoPosition: 'bottom',
@@ -83,7 +83,7 @@ const THEMES: Theme[] = [
     name: 'Neon',
     design: {
       frameColor: '#0A0A0A', labelBg: '#111111', labelTextColor: '#FFFFFF',
-      labelStyle: 'gradient', noteFont: 'uppercase',
+      labelStyle: 'gradient',
       dateStamp: true, dateStampColor: '#00FFC8', dateStampPosition: 'right',
       watermark: true, watermarkOpacity: 10, watermarkColor: '#00FFC8',
       filterStrength: 30, logoPosition: 'center',
@@ -95,7 +95,7 @@ const THEMES: Theme[] = [
     name: 'Retro',
     design: {
       frameColor: '#F5F0E8', labelBg: '#E8E0D0', labelTextColor: '#4A3728',
-      labelStyle: 'duotone', noteFont: 'caveat',
+      labelStyle: 'duotone',
       dateStamp: true, dateStampColor: '#8B4513', dateStampPosition: 'left',
       watermark: true, watermarkOpacity: 25, watermarkColor: '#FFFFFF',
       filterStrength: 70, logoPosition: 'bottom',
@@ -127,7 +127,7 @@ function brandify(d: PolaroidDesign, accent: string): PolaroidDesign {
 }
 
 // ── AI status type ────────────────────────────────────────────────────────────
-type AiStatus = 'idle' | 'analyzing' | 'generating' | 'done' | 'error';
+type AiStatus = 'idle' | 'analyzing' | 'done' | 'error';
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function PolaroidDesigner({
@@ -139,8 +139,6 @@ export default function PolaroidDesigner({
 
   const [design,        setDesign]        = useState<PolaroidDesign>(initialDesign);
   const [activeTheme,   setActiveTheme]   = useState<string | null>(null);
-  const [previewNote,   setPreviewNote]   = useState('Best night ever ♥');
-  const [showNote,      setShowNote]      = useState(false);
   const [hasTestPhoto,  setHasTestPhoto]  = useState(false);
   const [renderKey,     setRenderKey]     = useState(0);
   const [isPending,     startTransition]  = useTransition();
@@ -169,11 +167,10 @@ export default function PolaroidDesigner({
     await renderPolaroid(canvas, {
       design, eventName,
       logoImg:  logoImgRef.current,
-      noteText: showNote ? previewNote : '',
       photoEl:  testImgRef.current,
       accentColor,
     });
-  }, [design, eventName, showNote, previewNote, accentColor]);
+  }, [design, eventName, accentColor]);
 
   useEffect(() => { doRender(); }, [doRender, renderKey]);
 
@@ -662,7 +659,7 @@ export default function PolaroidDesigner({
             {/* ── 7. LOGO POSITIE ──────────────────────────────────── */}
             <Card title="Logo in Label">
               <p className="text-[11px] text-muted -mt-1 mb-2 leading-snug">
-                Logo/naam weergave (zichtbaar zonder herinnering)
+                Logo/naam weergave in het label
               </p>
               <div className="grid grid-cols-3 gap-1.5">
                 {([
@@ -713,30 +710,6 @@ export default function PolaroidDesigner({
               )}
             </Card>
 
-            {/* ── 9. LETTERTYPE ────────────────────────────────────── */}
-            <Card title="Herinnering Lettertype">
-              <div className="grid grid-cols-2 gap-2">
-                {([
-                  ['caveat',    'Handschrift', 'Best night ever ♥', 'var(--font-caveat), Caveat, cursive', '18px'],
-                  ['uppercase', 'Strak',       'BEST NIGHT EVER',  'Inter, sans-serif',                  '10px'],
-                ] as [PolaroidDesign['noteFont'], string, string, string, string][]).map(([val, lbl, preview, font, size]) => (
-                  <button key={val} onClick={() => set('noteFont', val)}
-                    className="rounded-xl p-2.5 flex flex-col items-center gap-1.5 transition-all"
-                    style={design.noteFont === val
-                      ? { background: `${accentColor}12`, border: `1.5px solid ${accentColor}45` }
-                      : { background: 'rgba(0,0,0,0.05)', border: '1.5px solid transparent' }}>
-                    <span style={{ fontFamily: font, fontSize: size, fontWeight: val === 'uppercase' ? 900 : 700, color: '#2C1810', lineHeight: 1.2 }}>
-                      {preview}
-                    </span>
-                    <span className="text-[10px] font-bold"
-                      style={{ color: design.noteFont === val ? accentColor : '#8A94A6' }}>
-                      {lbl}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </Card>
-
           </div>
         </aside>
 
@@ -764,29 +737,6 @@ export default function PolaroidDesigner({
 
           {/* Preview controls */}
           <div className="relative z-10 mt-6 flex items-center gap-3 flex-wrap justify-center px-4">
-            <div className="flex rounded-xl overflow-hidden"
-              style={{ border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.06)' }}>
-              {[['Zonder tekst', false], ['Met herinnering', true]].map(([lbl, val]) => (
-                <button key={String(val)} onClick={() => setShowNote(val as boolean)}
-                  className="px-3.5 py-1.5 text-xs font-bold transition-all"
-                  style={showNote === val ? { background: accentColor, color: '#fff' } : { color: 'rgba(255,255,255,0.45)' }}>
-                  {lbl as string}
-                </button>
-              ))}
-            </div>
-
-            {showNote && (
-              <input type="text" value={previewNote}
-                onChange={e => setPreviewNote(e.target.value.slice(0, 40))}
-                placeholder="Best night ever ♥"
-                className="px-4 py-1.5 rounded-xl outline-none text-white placeholder-white/30"
-                style={{
-                  background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)',
-                  fontFamily: 'var(--font-caveat), Caveat, cursive', fontSize: '20px', width: '220px',
-                }}
-              />
-            )}
-
             <label
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all hover:opacity-80"
               style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.55)' }}>

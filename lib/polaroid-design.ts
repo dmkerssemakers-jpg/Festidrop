@@ -1,5 +1,4 @@
 export type LabelStyle = 'solid' | 'accent-line' | 'gradient' | 'duotone' | 'dots' | 'grain';
-export type NoteFont  = 'caveat' | 'uppercase';
 
 export interface PolaroidDesign {
   // Frame
@@ -9,8 +8,6 @@ export interface PolaroidDesign {
   labelTextColor:    string;
   labelStyle:        LabelStyle;   // visual decoration on the label
   labelTagline:      string;       // persistent text at bottom of label (max 40 chars)
-  // Note text font
-  noteFont:          NoteFont;
   // Date stamp
   dateStamp:         boolean;
   dateStampColor:    string;
@@ -31,7 +28,6 @@ export const DEFAULT_DESIGN: PolaroidDesign = {
   labelTextColor:    '#2C1810',
   labelStyle:        'solid',
   labelTagline:      '',
-  noteFont:          'caveat',
   dateStamp:         true,
   dateStampColor:    '#E8192C',
   dateStampPosition: 'left',
@@ -54,7 +50,6 @@ export function parseDesign(json: unknown): PolaroidDesign {
     labelStyle:        LABEL_STYLES.includes(d.labelStyle as LabelStyle)
                          ? d.labelStyle as LabelStyle : DEFAULT_DESIGN.labelStyle,
     labelTagline:      typeof d.labelTagline === 'string'     ? d.labelTagline.slice(0, 40) : DEFAULT_DESIGN.labelTagline,
-    noteFont:          d.noteFont === 'uppercase'             ? 'uppercase'         : DEFAULT_DESIGN.noteFont,
     dateStamp:         typeof d.dateStamp === 'boolean'       ? d.dateStamp         : DEFAULT_DESIGN.dateStamp,
     dateStampColor:    typeof d.dateStampColor === 'string'   ? d.dateStampColor    : DEFAULT_DESIGN.dateStampColor,
     dateStampPosition: d.dateStampPosition === 'right'        ? 'right'             : 'left',
