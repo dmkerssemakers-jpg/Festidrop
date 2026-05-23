@@ -21,11 +21,12 @@ const PHOTO_OPTIONS = [5, 8, 10, 12, 15, 20];
 const BASE_URL      = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://festidrop.vercel.app';
 
 interface Props {
-  event:    Event & { notes?: string | null };
+  event:    Event & { notes?: string | null; clientId?: string | null };
   eventUrl: string;
+  clients:  { id: string; name: string }[];
 }
 
-export default function EventForm({ event, eventUrl }: Props) {
+export default function EventForm({ event, eventUrl, clients }: Props) {
   const [isPending,    startTransition] = useTransition();
   const [color,        setColor]        = useState(event.accentColor);
   const [maxPhotos,    setMaxPhotos]    = useState(event.maxPhotos);
@@ -180,6 +181,23 @@ export default function EventForm({ event, eventUrl }: Props) {
                   className="field"
                 />
               </Field>
+
+              {/* Client koppelen */}
+              {clients.length > 0 && (
+                <Field label="Klant" hint="optioneel">
+                  <select
+                    name="clientId"
+                    defaultValue={event.clientId ?? ''}
+                    className="field"
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <option value="">— Geen klant —</option>
+                    {clients.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </Field>
+              )}
 
               {/* Slug — locked, with copy button */}
               <div>

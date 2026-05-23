@@ -31,6 +31,17 @@ const nav = [
       </svg>
     ),
   },
+  {
+    href: '/admin/clients', label: 'Klanten',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+        <circle cx="6" cy="5" r="3" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M1 14c0-3 2.2-5 5-5s5 2 5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M11 7.5c1.7 0 3 1.3 3 3v1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M13 3.5a2 2 0 010 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
 ];
 
 const EXPANDED = 240;

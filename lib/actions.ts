@@ -45,10 +45,11 @@ export async function updateEvent(id: string, formData: FormData) {
   const endsAtRaw  = (formData.get('endsAt') as string | null)?.trim();
   const endsAt     = endsAtRaw ? new Date(endsAtRaw) : null;
   const notes      = (formData.get('notes') as string | null)?.trim() || null;
+  const clientId   = (formData.get('clientId') as string | null)?.trim() || null;
 
   await prisma.event.update({
     where: { id },
-    data: { name, slug, accentColor, emailText, maxPhotos, isActive, logoUrl, accessCode, endsAt, notes },
+    data: { name, slug, accentColor, emailText, maxPhotos, isActive, logoUrl, accessCode, endsAt, notes, clientId },
   });
 
   revalidatePath(`/admin/events/${id}`);
@@ -108,6 +109,53 @@ export async function deleteEvent(id: string) {
   await prisma.event.delete({ where: { id } });
   revalidatePath('/admin/events');
   redirect('/admin/events');
+}
+
+// ── Client CRUD ──────────────────────────────────────────────────────────────
+export async function createClient(formData: FormData) {
+  const name          = (formData.get('name') as string).trim();
+  const contactPerson = (formData.get('contactPerson') as string | null)?.trim() || null;
+  const email         = (formData.get('email') as string | null)?.trim() || null;
+  const phone         = (formData.get('phone') as string | null)?.trim() || null;
+  const website       = (formData.get('website') as string | null)?.trim() || null;
+  const notes         = (formData.get('notes') as string | null)?.trim() || null;
+
+  const client = await prisma.client.create({
+    data: { name, contactPerson, email, phone, website, notes },
+  });
+
+  revalidatePath('/admin/clients');
+  redirect(`/admin/clients/${client.id}`);
+}
+
+export async function updateClient(id: string, formData: FormData) {
+  const name          = (formData.get('name') as string).trim();
+  const contactPerson = (formData.get('contactPerson') as string | null)?.trim() || null;
+  const email         = (formData.get('email') as string | null)?.trim() || null;
+  const phone         = (formData.get('phone') as string | null)?.trim() || null;
+  const website       = (formData.get('website') as string | null)?.trim() || null;
+  const notes         = (formData.get('notes') as string | null)?.trim() || null;
+
+  await prisma.client.update({
+    where: { id },
+    data: { name, contactPerson, email, phone, website, notes },
+  });
+
+  revalidatePath(`/admin/clients/${id}`);
+  revalidatePath('/admin/clients');
+}
+
+export async function deleteClient(id: string) {
+  await prisma.client.delete({ where: { id } });
+  revalidatePath('/admin/clients');
+  redirect('/admin/clients');
+}
+
+export async function setEventClient(eventId: string, clientId: string | null) {
+  await prisma.event.update({ where: { id: eventId }, data: { clientId } });
+  revalidatePath('/admin/clients');
+  revalidatePath('/admin/events');
+  revalidatePath(`/admin/events/${eventId}`);
 }
 
 // ── Whitelist ────────────────────────────────────────────────────────────────

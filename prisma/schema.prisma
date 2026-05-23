@@ -8,6 +8,19 @@ datasource db {
   directUrl  = env("POSTGRES_URL")
 }
 
+model Client {
+  id            String   @id @default(cuid())
+  name          String
+  contactPerson String?
+  email         String?
+  phone         String?
+  website       String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  events        Event[]
+}
+
 model Event {
   id          String      @id @default(cuid())
   name        String
@@ -21,6 +34,8 @@ model Event {
   endsAt       DateTime?
   designConfig Json?
   notes        String?
+  clientId    String?
+  client      Client?     @relation(fields: [clientId], references: [id])
   createdAt    DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   drops       Drop[]

@@ -17,8 +17,8 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
   start7Days.setDate(start7Days.getDate() - 6);
   start7Days.setHours(0, 0, 0, 0);
 
-  const [event, drops, chartDrops] = await Promise.all([
-    prisma.event.findUnique({ where: { id }, include: { whitelist: true } }),
+  const [event, drops, chartDrops, clients] = await Promise.all([
+    prisma.event.findUnique({ where: { id }, include: { whitelist: true, client: { select: { id: true, name: true } } } }),
     prisma.drop.findMany({
       where:   { eventId: id },
       orderBy: { sentAt: 'desc' },
@@ -28,6 +28,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
       where:  { eventId: id, sentAt: { gte: start7Days } },
       select: { sentAt: true },
     }),
+    prisma.client.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
   ]);
 
   if (!event) notFound();
@@ -99,7 +100,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
             </div>
 
             <div>
-              <div className="flex items-center gap-2 mb-0.5">
+              <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                 <h1 className="text-2xl font-black text-navy" style={{ letterSpacing: '-0.03em' }}>
                   {event.name}
                 </h1>
@@ -112,6 +113,15 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
                 >
                   {event.isActive ? '● actief' : '○ inactief'}
                 </span>
+                {event.client && (
+                  <a
+                    href={`/admin/clients/${event.client.id}`}
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-full transition-opacity hover:opacity-70"
+                    style={{ background: 'rgba(30,139,255,0.10)', color: '#1E8BFF' }}
+                  >
+                    ↗ {event.client.name}
+                  </a>
+                )}
               </div>
               <p className="text-xs text-muted font-medium">{eventUrl}</p>
             </div>
@@ -208,7 +218,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
             accentColor={event.accentColor}
             chartData={chartData}
           />
-          <EventForm event={event} eventUrl={eventUrl} />
+          <EventForm event={event} eventUrl={eventUrl} clients={clients} />
         </div>
 
         <div className="space-y-6">
