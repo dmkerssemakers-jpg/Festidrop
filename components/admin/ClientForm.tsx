@@ -58,6 +58,7 @@ export default function ClientForm({ client }: Props) {
         boxShadow:  '0 4px 16px rgba(7,22,47,0.06)',
       }}
     >
+      {/* Unsaved banner */}
       {isDirty && (
         <div
           className="sticky top-0 z-20 flex items-center justify-between px-5 py-2.5"
@@ -68,7 +69,7 @@ export default function ClientForm({ client }: Props) {
           }}
         >
           <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#B07800' }} />
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#B07800' }} />
             <span className="text-xs font-bold" style={{ color: '#B07800' }}>Niet-opgeslagen wijzigingen</span>
           </div>
           <button
@@ -88,9 +89,17 @@ export default function ClientForm({ client }: Props) {
       )}
 
       <div className="p-6">
-        <h2 className="text-[10px] font-black uppercase tracking-[0.14em] text-muted mb-5">
-          Klantgegevens
-        </h2>
+        {/* Section header */}
+        <div className="flex items-center gap-2.5 mb-5">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+            style={{ background: 'rgba(30,139,255,0.1)' }}>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <circle cx="6.5" cy="4.5" r="2.5" stroke="#1E8BFF" strokeWidth="1.3"/>
+              <path d="M1.5 12c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="#1E8BFF" strokeWidth="1.3" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted">Klantgegevens</p>
+        </div>
 
         <form id="client-form" onSubmit={handleSubmit} onChange={markDirty} className="space-y-4">
 
@@ -99,10 +108,13 @@ export default function ClientForm({ client }: Props) {
               placeholder="bijv. Mojo Concerts" className="field" />
           </Field>
 
-          <div style={{ borderTop: '1px solid rgba(189,239,255,0.4)', marginTop: 8 }} />
-
-          <p className="text-[9px] font-black uppercase tracking-[0.16em]"
-            style={{ color: 'rgba(108,122,141,0.6)' }}>Contact</p>
+          {/* Contact divider */}
+          <SectionDivider label="Contact" color="#00C896">
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+              <path d="M2 1.5h2l1 2.5-1.5 1a6 6 0 002.5 2.5l1-1.5 2.5 1v2A1 1 0 019 10C4 10 1 7 1 2a1 1 0 011-1z"
+                stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+            </svg>
+          </SectionDivider>
 
           <Field label="Contactpersoon">
             <input name="contactPerson" defaultValue={client.contactPerson ?? ''}
@@ -110,25 +122,43 @@ export default function ClientForm({ client }: Props) {
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="E-mail">
+            <Field label="E-mail" icon={
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                <rect x="1" y="2" width="9" height="7" rx="1.5" stroke="#6C7A8D" strokeWidth="1.1"/>
+                <path d="M1 4l4.5 3L10 4" stroke="#6C7A8D" strokeWidth="1.1" strokeLinecap="round"/>
+              </svg>
+            }>
               <input name="email" type="email" defaultValue={client.email ?? ''}
                 placeholder="jan@bedrijf.nl" className="field" />
             </Field>
-            <Field label="Telefoon">
+            <Field label="Telefoon" icon={
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                <path d="M2 1.5h2l1 2.5-1.5 1a6 6 0 002.5 2.5l1-1.5 2.5 1v2A1 1 0 019 10C4 10 1 7 1 2a1 1 0 011-1z"
+                  stroke="#6C7A8D" strokeWidth="1.1" strokeLinecap="round"/>
+              </svg>
+            }>
               <input name="phone" defaultValue={client.phone ?? ''}
                 placeholder="+31 6 12345678" className="field" />
             </Field>
           </div>
 
-          <Field label="Website">
+          <Field label="Website" icon={
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+              <circle cx="5.5" cy="5.5" r="4.5" stroke="#6C7A8D" strokeWidth="1.1"/>
+              <path d="M5.5 1c-1.4 1.5-2 3-2 4.5s.6 3 2 4.5M5.5 1c1.4 1.5 2 3 2 4.5s-.6 3-2 4.5M1 5.5h9" stroke="#6C7A8D" strokeWidth="1.1"/>
+            </svg>
+          }>
             <input name="website" type="url" defaultValue={client.website ?? ''}
               placeholder="https://bedrijf.nl" className="field" />
           </Field>
 
-          <div style={{ borderTop: '1px solid rgba(189,239,255,0.4)', marginTop: 8 }} />
-
-          <p className="text-[9px] font-black uppercase tracking-[0.16em]"
-            style={{ color: 'rgba(108,122,141,0.6)' }}>Intern</p>
+          {/* Intern divider */}
+          <SectionDivider label="Intern" color="#7B2FF7">
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+              <rect x="1.5" y="1.5" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.1"/>
+              <path d="M3.5 4.5h4M3.5 6.5h2.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+            </svg>
+          </SectionDivider>
 
           <Field label="Notities" hint="alleen voor jou zichtbaar">
             <textarea name="notes" defaultValue={client.notes ?? ''}
@@ -137,7 +167,7 @@ export default function ClientForm({ client }: Props) {
           </Field>
 
           {/* Actions */}
-          <div className="flex gap-3 pt-1">
+          <div className="flex gap-3 pt-2">
             <button
               type="submit" disabled={isPending}
               className="flex-1 rounded-xl py-3 text-sm font-bold text-white transition-all disabled:opacity-60 active:scale-[0.98]"
@@ -164,7 +194,7 @@ export default function ClientForm({ client }: Props) {
             {deleteStep === 'idle' ? (
               <button type="button" onClick={handleDelete} disabled={isPending}
                 className="rounded-xl px-4 py-3 text-sm font-bold transition-all disabled:opacity-60"
-                style={{ background: 'rgba(255,30,30,0.08)', color: '#CC1010' }}>
+                style={{ background: 'rgba(255,30,30,0.07)', color: '#CC1010', border: '1px solid rgba(255,30,30,0.12)' }}>
                 Verwijder
               </button>
             ) : (
@@ -187,28 +217,45 @@ export default function ClientForm({ client }: Props) {
       </div>
 
       <style jsx>{`
-        .field-label {
-          font-size: 11px; font-weight: 700; text-transform: uppercase;
-          letter-spacing: 0.1em; color: #6C7A8D;
-        }
         .field {
           width: 100%; border-radius: 12px; padding: 10px 14px;
           font-size: 14px; font-family: inherit;
           background: rgba(247,251,255,0.8);
-          border: 1px solid rgba(189,239,255,0.6);
-          color: #07162F; outline: none; transition: border-color 0.15s;
+          border: 1.5px solid rgba(189,239,255,0.6);
+          color: #07162F; outline: none;
+          transition: border-color 0.15s, box-shadow 0.15s;
         }
-        .field:focus { border-color: #1E8BFF; }
-        .field::placeholder { color: #6C7A8D; }
+        .field:focus {
+          border-color: #1E8BFF;
+          box-shadow: 0 0 0 3px rgba(30,139,255,0.08);
+        }
+        .field::placeholder { color: rgba(108,122,141,0.6); }
       `}</style>
     </div>
   );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function SectionDivider({ label, color, children }: { label: string; color: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3" style={{ marginTop: 8 }}>
+      <div className="flex-1 h-px" style={{ background: 'rgba(189,239,255,0.4)' }} />
+      <div
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.12em]"
+        style={{ background: `${color}10`, color, border: `1px solid ${color}20` }}
+      >
+        <span style={{ color }}>{children}</span>
+        {label}
+      </div>
+      <div className="flex-1 h-px" style={{ background: 'rgba(189,239,255,0.4)' }} />
+    </div>
+  );
+}
+
+function Field({ label, hint, icon, children }: { label: string; hint?: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
-      <div className="flex items-baseline gap-2 mb-1.5">
+      <div className="flex items-center gap-1.5 mb-1.5">
+        {icon && <span className="opacity-70">{icon}</span>}
         <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#6C7A8D' }}>
           {label}
         </label>
