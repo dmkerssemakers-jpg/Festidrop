@@ -95,6 +95,13 @@ export async function saveEventDesign(eventId: string, design: PolaroidDesign) {
   revalidatePath('/admin');
 }
 
+// ── Toggle event active/inactive ─────────────────────────────────────────────
+export async function toggleEventActive(id: string, isActive: boolean) {
+  await prisma.event.update({ where: { id }, data: { isActive } });
+  revalidatePath('/admin/events');
+  revalidatePath('/admin');
+}
+
 // ── Delete event ─────────────────────────────────────────────────────────────
 export async function deleteEvent(id: string) {
   await prisma.event.delete({ where: { id } });
