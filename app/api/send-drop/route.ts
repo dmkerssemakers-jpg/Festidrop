@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   const normalizedEmail = email.trim().toLowerCase();
 
   // ── Load event (if slug provided) ───────────────────────────────
-  let event: { id: string; name: string; emailText: string | null; whitelist: { email: string }[] } | null = null;
+  let event: { id: string; name: string; emailText: string | null; logoUrl: string | null; accentColor: string; whitelist: { email: string }[] } | null = null;
   if (slug) {
     try {
       const candidate = await prisma.event.findUnique({
@@ -52,6 +52,8 @@ export async function POST(req: NextRequest) {
           name: true,
           emailText: true,
           endsAt: true,
+          logoUrl: true,
+          accentColor: true,
           whitelist: { select: { email: true } },
         },
       });
@@ -88,9 +90,11 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Build e-mail ─────────────────────────────────────────────────
-  const eventName = event?.name ?? 'FestiDrop';
-  const customText = event?.emailText
-    ? `<p style="margin:12px 0 0;color:#6C7A8D;font-size:14px;line-height:1.6;">${event.emailText}</p>`
+  const eventName   = event?.name ?? 'FestiDrop';
+  const accentColor = event?.accentColor ?? '#1E8BFF';
+  const logoUrl     = event?.logoUrl ?? null;
+  const customText  = event?.emailText
+    ? `<p style="margin:16px 0 0;color:#6C7A8D;font-size:14px;line-height:1.6;">${event.emailText}</p>`
     : '';
 
   const attachments = photos.map((dataUrl, i) => ({
@@ -98,6 +102,13 @@ export async function POST(req: NextRequest) {
     content: dataUrl.replace(/^data:image\/\w+;base64,/, ''),
     contentType: 'image/jpeg' as const,
   }));
+
+  const logoBlock = logoUrl
+    ? `<tr><td align="center" style="padding-bottom:24px;">
+        <img src="${logoUrl}" alt="${eventName}" height="52"
+          style="max-width:180px;height:52px;object-fit:contain;display:block;" />
+      </td></tr>`
+    : '';
 
   const html = `
 <!DOCTYPE html>
@@ -108,16 +119,16 @@ export async function POST(req: NextRequest) {
     <tr><td align="center">
       <table width="100%" style="max-width:560px;">
 
+        ${logoBlock}
+
         <!-- Header -->
         <tr><td align="center" style="padding-bottom:28px;">
-          <p style="margin:0 0 6px;font-size:13px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#6C7A8D;">
+          <p style="margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${accentColor};">
             ● ${eventName}
           </p>
           <h1 style="margin:0;font-size:32px;font-weight:900;color:#07162F;letter-spacing:-0.04em;line-height:1.05;">
             Jouw FestiDrop<br>
-            <span style="background:linear-gradient(90deg,#1E8BFF,#20D6E8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">
-              is er!
-            </span>
+            <span style="color:${accentColor};">is er!</span>
           </h1>
           <p style="margin:12px 0 0;color:#6C7A8D;font-size:15px;line-height:1.6;">
             Je ${photos.length}&nbsp;polaroid-foto's zitten als bijlage bij deze mail.<br>
@@ -127,11 +138,15 @@ export async function POST(req: NextRequest) {
         </td></tr>
 
         <!-- Card -->
-        <tr><td style="background:rgba(255,255,255,0.85);border:1px solid rgba(189,239,255,0.55);
-                        border-radius:24px;padding:28px 24px;text-align:center;
-                        box-shadow:0 24px 80px rgba(7,22,47,0.08);">
-          <p style="margin:0 0 8px;font-size:15px;color:#07162F;font-weight:700;">
-            📎 ${photos.length} foto's bijgevoegd
+        <tr><td style="background:#ffffff;border:1px solid rgba(189,239,255,0.7);
+                        border-radius:20px;padding:28px 24px;text-align:center;
+                        box-shadow:0 8px 40px rgba(7,22,47,0.07);">
+          <div style="width:48px;height:48px;border-radius:14px;margin:0 auto 14px;
+                      background:${accentColor}18;display:flex;align-items:center;justify-content:center;">
+            <span style="font-size:22px;">📎</span>
+          </div>
+          <p style="margin:0 0 6px;font-size:16px;color:#07162F;font-weight:800;letter-spacing:-0.02em;">
+            ${photos.length} foto's bijgevoegd
           </p>
           <p style="margin:0;font-size:13px;color:#6C7A8D;line-height:1.6;">
             Open de bijlagen om jouw festivalmomenten te bekijken.<br>
@@ -139,9 +154,12 @@ export async function POST(req: NextRequest) {
           </p>
         </td></tr>
 
-        <!-- Privacy note -->
-        <tr><td align="center" style="padding-top:20px;">
-          <p style="margin:0;font-size:11px;color:#A7B1C2;line-height:1.6;">
+        <!-- Footer -->
+        <tr><td align="center" style="padding-top:24px;">
+          <p style="margin:0 0 6px;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#A7B1C2;">
+            Powered by FestiDrop
+          </p>
+          <p style="margin:0;font-size:11px;color:#C5CDD8;line-height:1.6;">
             We bewaren geen kopie van jouw foto's.<br>
             Je e-mailadres gebruiken we alleen voor deze drop.
           </p>
@@ -162,7 +180,7 @@ export async function POST(req: NextRequest) {
     const { data, error } = await resend.emails.send({
       from: FROM,
       to: email,
-      subject: `📸 Jouw FestiDrop — ${photos.length} polaroids wachten op je`,
+      subject: `📸 ${eventName} × FestiDrop — jouw ${photos.length} polaroid${photos.length !== 1 ? 's' : ''} zijn er!`,
       html,
       attachments,
     });
