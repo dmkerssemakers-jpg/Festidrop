@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import BackgroundPattern from './BackgroundPattern';
 import { FestiDropLogo } from './Logo';
 import EmailDropCard from './EmailDropCard';
-import PhotoPreviewGallery from './PhotoPreviewGallery';
 
 interface Props {
   slug:         string;
@@ -79,46 +78,39 @@ export default function SendPageClient({ slug, accentColor, eventName, logoUrl }
               style={{ background: `${accentColor}30` }}
             />
 
-            {/* Photo layers — back to front */}
+            {/* Decorative blank polaroid stack — no photos shown (surprise UX) */}
             {[
               { rotate: -11, y: 10,  x: -14, z: 1, delay: 0.05 },
               { rotate:   7, y:  2,  x:  10, z: 2, delay: 0.12 },
               { rotate:  -2, y: -8,  x:   0, z: 3, delay: 0.20 },
-            ].map((s, i) => {
-              const photoIdx = Math.max(0, photos.length - (3 - i));
-              return (
-                <motion.div
-                  key={i}
-                  className="absolute rounded-lg overflow-hidden"
-                  style={{
-                    width:  '136px',
-                    height: '168px',
-                    background: '#FEFDF8',
-                    left: '50%',
-                    top:  '50%',
-                    marginLeft: '-68px',
-                    marginTop:  '-84px',
-                    zIndex: s.z,
-                    boxShadow: '0 10px 40px rgba(7,22,47,0.28), 0 2px 8px rgba(7,22,47,0.12)',
-                  }}
-                  initial={{ opacity: 0, scale: 0.8, rotate: 0 }}
-                  animate={{ opacity: 1, scale: 1, rotate: s.rotate, x: s.x, y: s.y }}
-                  transition={{ delay: s.delay, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-                >
-                  {photos[photoIdx] && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={photos[photoIdx]}
-                      alt=""
-                      className="absolute inset-0 w-full h-full object-cover"
-                      style={{ top: 0, left: 0, bottom: '26px', height: 'calc(100% - 26px)' }}
-                    />
-                  )}
-                  {/* Polaroid label area */}
-                  <div className="absolute bottom-0 left-0 right-0 h-7 bg-[#FEFDF8]" />
-                </motion.div>
-              );
-            })}
+            ].map((s, i) => (
+              <motion.div
+                key={i}
+                className="absolute rounded-lg overflow-hidden"
+                style={{
+                  width:  '136px',
+                  height: '168px',
+                  background: '#FEFDF8',
+                  left: '50%',
+                  top:  '50%',
+                  marginLeft: '-68px',
+                  marginTop:  '-84px',
+                  zIndex: s.z,
+                  boxShadow: '0 10px 40px rgba(7,22,47,0.28), 0 2px 8px rgba(7,22,47,0.12)',
+                }}
+                initial={{ opacity: 0, scale: 0.8, rotate: 0 }}
+                animate={{ opacity: 1, scale: 1, rotate: s.rotate, x: s.x, y: s.y }}
+                transition={{ delay: s.delay, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+              >
+                {/* Blurred photo area */}
+                <div
+                  className="absolute inset-0"
+                  style={{ bottom: '26px', background: 'linear-gradient(135deg, #d4d0c8 0%, #e8e4da 50%, #ccc8be 100%)' }}
+                />
+                {/* Polaroid label area */}
+                <div className="absolute bottom-0 left-0 right-0 h-7 bg-[#FEFDF8]" />
+              </motion.div>
+            ))}
 
             {/* Photo count badge */}
             <motion.div
@@ -146,16 +138,6 @@ export default function SendPageClient({ slug, accentColor, eventName, logoUrl }
               {photos.length} polaroid{photos.length !== 1 ? 's' : ''} vastgelegd ✦
             </p>
           </motion.div>
-        </motion.div>
-
-        {/* Photo preview gallery */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.32, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          className="mb-6"
-        >
-          <PhotoPreviewGallery photos={photos} accentColor={accentColor} />
         </motion.div>
 
         {/* Email form card */}
