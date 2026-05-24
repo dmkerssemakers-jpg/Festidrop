@@ -33,7 +33,8 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   });
   if (!invoice) notFound();
 
-  const subtotal = invoice.lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
+  type LineRow = (typeof invoice.lines)[number];
+  const subtotal = invoice.lines.reduce((s: number, l: LineRow) => s + l.quantity * l.unitPrice, 0);
   const vat      = subtotal * invoice.vatPct / 100;
   const total    = subtotal + vat;
   const sc       = STATUS_COLOR[invoice.status] ?? STATUS_COLOR.CONCEPT;

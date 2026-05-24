@@ -23,7 +23,7 @@ function fmt(n: number) {
 }
 
 function lineTotal(lines: { quantity: number; unitPrice: number }[]) {
-  return lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
+  return lines.reduce((s: number, l: { quantity: number; unitPrice: number }) => s + l.quantity * l.unitPrice, 0);
 }
 
 export default async function InvoicesPage() {
