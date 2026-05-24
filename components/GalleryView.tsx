@@ -18,7 +18,10 @@ function rotation(idx: number) {
   return ((idx * 137) % 11) - 5; // -5 to +5 degrees
 }
 
-export default function GalleryView({ event, photos, email }: { event: EventInfo; photos: Photo[]; email: string }) {
+export default function GalleryView({ event, photos, email, oldestSentAt }: { event: EventInfo; photos: Photo[]; email: string; oldestSentAt?: string | null }) {
+  const daysLeft = oldestSentAt
+    ? Math.max(0, 30 - Math.floor((Date.now() - new Date(oldestSentAt).getTime()) / 86_400_000))
+    : null;
   const [lightbox, setLightbox]   = useState<number | null>(null);
   const [copied,   setCopied]     = useState(false);
   const [dlAll,    setDlAll]      = useState(false);
@@ -57,6 +60,27 @@ export default function GalleryView({ event, photos, email }: { event: EventInfo
 
   return (
     <div style={{ minHeight: '100vh', background: '#07162F', color: 'white', fontFamily: 'Inter, sans-serif' }}>
+
+      {/* Countdown banner */}
+      {daysLeft !== null && (
+        <div style={{
+          background: daysLeft <= 5 ? 'rgba(255,80,80,0.12)' : 'rgba(255,184,0,0.10)',
+          borderBottom: `1px solid ${daysLeft <= 5 ? 'rgba(255,80,80,0.2)' : 'rgba(255,184,0,0.15)'}`,
+          padding: '10px 24px',
+          textAlign: 'center',
+          fontSize: 12,
+          fontWeight: 600,
+          color: daysLeft <= 5 ? '#FF8080' : '#E8A800',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+        }}>
+          {daysLeft === 0
+            ? '⚠️ Je filmrol wordt vandaag verwijderd — download je foto\'s nu!'
+            : `⏳ Je filmrol is nog ${daysLeft} dag${daysLeft !== 1 ? 'en' : ''} beschikbaar — download ze om ze te bewaren.`}
+        </div>
+      )}
 
       {/* Top bar */}
       <div style={{ borderBottom: '1px solid rgba(189,239,255,0.08)', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', maxWidth: 1100, margin: '0 auto' }}>

@@ -87,7 +87,8 @@ export default async function GalleryPage({
   });
 
   type DropWithPhotos = (typeof drops)[number];
-  const photos = drops.flatMap((d: DropWithPhotos) => d.photos);
+  const photos       = drops.flatMap((d: DropWithPhotos) => d.photos);
+  const oldestSentAt = drops[0]?.sentAt?.toISOString() ?? null;
 
-  return <GalleryView event={event} photos={photos} email={email.trim().toLowerCase()} />;
+  return <GalleryView event={event} photos={photos} email={email.trim().toLowerCase()} oldestSentAt={oldestSentAt} />;
 }

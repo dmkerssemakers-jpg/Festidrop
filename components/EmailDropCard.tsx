@@ -90,6 +90,7 @@ export default function EmailDropCard({ photos, onSent, slug, accentColor = '#1E
   const [email,    setEmail]    = useState('');
   const [state,    setState]    = useState<State>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [consent,  setConsent]  = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -213,9 +214,26 @@ export default function EmailDropCard({ photos, onSent, slug, accentColor = '#1E
                 onBlur={e  => { e.target.style.borderColor = 'rgba(255,255,255,0.12)'; e.target.style.background = 'rgba(255,255,255,0.07)'; }}
               />
 
+              {/* Consent checkbox */}
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', textAlign: 'left' }}>
+                <input
+                  type="checkbox"
+                  checked={consent}
+                  onChange={e => setConsent(e.target.checked)}
+                  disabled={state === 'sending'}
+                  style={{ marginTop: 2, accentColor, flexShrink: 0, width: 16, height: 16, cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
+                  Ik ga akkoord dat mijn foto&apos;s 30 dagen worden bewaard voor mijn persoonlijke filmrol.{' '}
+                  <a href="/privacy" target="_blank" style={{ color: `${accentColor}99`, textDecoration: 'underline' }}>
+                    Privacybeleid
+                  </a>
+                </span>
+              </label>
+
               <motion.button
                 type="submit"
-                disabled={state === 'sending' || !email}
+                disabled={state === 'sending' || !email || !consent}
                 whileTap={state !== 'sending' ? { scale: 0.97 } : {}}
                 className="w-full py-4 rounded-full text-sm font-black text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 style={{
