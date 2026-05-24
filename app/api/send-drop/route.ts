@@ -104,7 +104,6 @@ export async function POST(req: NextRequest) {
     contentType: 'image/jpeg' as const,
   }));
 
-  const base = (process.env.NEXT_PUBLIC_BASE_URL ?? 'https://festidrop.vercel.app').replace(/\/$/, '');
   const galleryUrl = event?.id && slug
     ? `${base}/gallery/${slug}?email=${encodeURIComponent(normalizedEmail)}`
     : null;
