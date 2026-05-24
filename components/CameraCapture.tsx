@@ -223,7 +223,17 @@ export default function CameraCapture({
     let sx = 0, sy = 0, sw = vw, sh = vh;
     if (vw / vh > 1) { sw = vh; sx = (vw - sw) / 2; }
     else             { sh = vw; sy = (vh - sh) / 2; }
-    ctx.drawImage(video, sx, sy, sw, sh, pad, pad, img, img);
+
+    // Mirror horizontally for front camera (Snapchat-style — keeps the natural look)
+    if (facingMode === 'user') {
+      ctx.save();
+      ctx.translate(W, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, sx, sy, sw, sh, pad, pad, img, img);
+      ctx.restore();
+    } else {
+      ctx.drawImage(video, sx, sy, sw, sh, pad, pad, img, img);
+    }
 
     applyPolaroidFilter(ctx, pad, pad, img, img, d.filterStrength);
 
@@ -558,10 +568,13 @@ export default function CameraCapture({
             </div>
           )}
 
-          {/* Live video */}
+          {/* Live video — mirrored for front camera (Snapchat-style) */}
           <video ref={videoRef} autoPlay playsInline muted
             className="w-full h-full object-cover"
-            style={{ display: permission === 'granted' ? 'block' : 'none' }}
+            style={{
+              display:   permission === 'granted' ? 'block' : 'none',
+              transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
+            }}
           />
 
           {/* Viewfinder corners + controls */}
