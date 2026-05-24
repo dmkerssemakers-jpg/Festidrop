@@ -102,7 +102,7 @@ export default function GalleryView({ event, photos, email, oldestSentAt }: { ev
             <button
               onClick={downloadAll}
               disabled={dlAll}
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(189,239,255,0.12)', color: 'rgba(189,239,255,0.7)', borderRadius: 10, padding: '8px 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+              style={{ background: event.accentColor, border: 'none', color: 'white', borderRadius: 10, padding: '8px 16px', fontSize: 12, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: `0 4px 14px ${event.accentColor}50` }}
             >
               {dlAll ? '⏳ Bezig…' : '⬇ Download alle'}
             </button>
@@ -148,6 +148,53 @@ export default function GalleryView({ event, photos, email, oldestSentAt }: { ev
         </div>
       )}
 
+      {/* Prominent download CTA */}
+      {photos.length > 0 && (
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 24px' }}>
+          <div style={{
+            background: `${event.accentColor}12`,
+            border: `1px solid ${event.accentColor}35`,
+            borderRadius: 16,
+            padding: '16px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 12,
+          }}>
+            <div>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'white' }}>
+                💾 Bewaar je foto's — ze worden na 30 dagen verwijderd
+              </p>
+              <p style={{ margin: '3px 0 0', fontSize: 11, color: 'rgba(189,239,255,0.5)' }}>
+                {daysLeft !== null
+                  ? `Nog ${daysLeft} dag${daysLeft !== 1 ? 'en' : ''} beschikbaar · download ze nu om ze te bewaren`
+                  : 'Download je foto\'s om ze permanent te bewaren'}
+              </p>
+            </div>
+            <button
+              onClick={downloadAll}
+              disabled={dlAll}
+              style={{
+                background: event.accentColor,
+                border: 'none',
+                color: 'white',
+                borderRadius: 10,
+                padding: '10px 22px',
+                fontSize: 13,
+                fontWeight: 800,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                boxShadow: `0 6px 18px ${event.accentColor}50`,
+                flexShrink: 0,
+              }}
+            >
+              {dlAll ? '⏳ Bezig…' : `⬇ Download alle ${photos.length} foto's`}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Polaroid grid */}
       {photos.length > 0 && (
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 80px' }}>
@@ -184,14 +231,21 @@ export default function GalleryView({ event, photos, email, oldestSentAt }: { ev
                   style={{ width: '100%', display: 'block', aspectRatio: '1', objectFit: 'cover' }}
                   loading="lazy"
                 />
-                <p style={{ margin: '10px 0 0', textAlign: 'center', fontSize: 11, color: '#bbb', fontFamily: 'Georgia, serif', letterSpacing: '0.05em' }}>
-                  {event.name}
-                </p>
               </div>
             ))}
           </div>
         </div>
       )}
+
+      {/* Footer */}
+      <div style={{ borderTop: '1px solid rgba(189,239,255,0.06)', padding: '20px 24px', textAlign: 'center' }}>
+        <p style={{ margin: 0, fontSize: 11, color: 'rgba(189,239,255,0.25)' }}>
+          Foto's worden 30 dagen bewaard en daarna automatisch verwijderd.{' '}
+          <a href="/privacy" style={{ color: 'rgba(189,239,255,0.4)', textDecoration: 'underline' }}>
+            Privacybeleid
+          </a>
+        </p>
+      </div>
 
       {/* Lightbox */}
       {lightbox !== null && (
