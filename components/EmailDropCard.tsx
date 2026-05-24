@@ -12,20 +12,22 @@ type Props = {
   logoUrl?:     string;
 };
 
-// Compress a photo to max 500px / JPEG 0.72 before sending to API
-// Reduces each photo from ~180KB to ~55KB → 20 photos stay well under Vercel's 4.5MB limit
+// Compress a photo before sending to API.
+// MAX=1000 → the 600×750 polaroid canvas is never downscaled (max dim is 750).
+// quality=0.86 keeps text and fine detail sharp (~150–200 KB per photo).
+// 20 photos × 200 KB × 1.33 base64 overhead ≈ 5.3 MB — add the 20 MB API guard as safety net.
 function compressForEmail(dataUrl: string): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
-      const MAX   = 500;
+      const MAX   = 1000;
       const scale = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
       const w     = Math.round(img.naturalWidth  * scale);
       const h     = Math.round(img.naturalHeight * scale);
       const c     = document.createElement('canvas');
       c.width = w; c.height = h;
       c.getContext('2d')!.drawImage(img, 0, 0, w, h);
-      resolve(c.toDataURL('image/jpeg', 0.72));
+      resolve(c.toDataURL('image/jpeg', 0.86));
     };
     img.onerror = () => resolve(dataUrl); // fallback: send original
     img.src = dataUrl;

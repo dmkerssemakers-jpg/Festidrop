@@ -34,9 +34,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "email en foto's zijn verplicht" }, { status: 400 });
   }
 
-  // Basic sanity: reject suspiciously large payloads early
+  // Basic sanity: reject suspiciously large payloads early.
+  // At quality=0.86 each photo is ~200 KB → base64 ~270 KB.
+  // 10 photos × 270 KB = 2.7 MB — well under Vercel's 4.5 MB body limit.
+  // Guard at 6 000 000 chars (~4.5 MB raw) to catch abuse before Vercel rejects.
   const totalChars = photos.reduce((s: number, p: string) => s + p.length, 0);
-  if (totalChars > 20_000_000) {
+  if (totalChars > 6_000_000) {
     return NextResponse.json({ error: "Payload te groot. Probeer opnieuw." }, { status: 413 });
   }
 
