@@ -49,6 +49,8 @@ export default function CameraCapture({
   const onCompleteRef       = useRef(onComplete);
   // Stable ref to finalizePolaroid — prevents shoot() from having a stale closure
   const finalizePolaroidRef = useRef<((isLast: boolean) => Promise<void>) | null>(null);
+  // Stable ref to flashAndShoot — used by countdown effect to avoid stale deps
+  const flashAndShootRef    = useRef<(() => void) | null>(null);
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
 
   // Pre-load logo
@@ -73,11 +75,14 @@ export default function CameraCapture({
   const [switching,      setSwitching]      = useState(false);
   const [countdownSecs,  setCountdownSecs]  = useState<0 | 2 | 5>(0);
   const [finalizing,     setFinalizing]     = useState(false);
+  // Flash state
+  const [flashMode,      setFlashMode]      = useState<'off' | 'on'>('off');
+  const [screenFlashing, setScreenFlashing] = useState(false); // full-screen white overlay for selfie flash
 
   const remaining  = maxPhotos - count;
   const isComplete = count >= maxPhotos;
   // Derived: whether the shutter button should be interactive
-  const canShoot   = permission === 'granted' && !isComplete && countdown === null && !finalizing;
+  const canShoot   = permission === 'granted' && !isComplete && countdown === null && !finalizing && !screenFlashing;
 
   // Derive a card background with a subtle tint of the accent color
   const [ar, ag, ab] = accentColor.startsWith('#') ? hexToRgb(accentColor) : [7, 22, 47];
@@ -117,6 +122,7 @@ export default function CameraCapture({
   // ── Switch front / back camera ───────────────────────────────────
   const switchCamera = useCallback(async () => {
     if (permission !== 'granted' || switching || flashing) return;
+    // Turn off torch before switching (auto-resets when track stops, but be explicit)
     setSwitching(true);
     streamRef.current?.getTracks().forEach(t => t.stop());
     streamRef.current = null;
@@ -171,6 +177,18 @@ export default function CameraCapture({
       streamRef.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Hardware torch helper (rear camera only) ─────────────────────
+  const setTorch = useCallback(async (on: boolean) => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    try {
+      // torch is a non-standard constraint; cast to silence TypeScript
+      await track.applyConstraints({ advanced: [{ torch: on } as MediaTrackConstraintSet] });
+    } catch {
+      // torch not supported on this device/browser — silently ignore
+    }
+  }, []);
 
   // ── Delete last photo (undo) ─────────────────────────────────────
   const deleteLastPhoto = useCallback(() => {
@@ -324,23 +342,48 @@ export default function CameraCapture({
   // Keep the ref in sync with the latest finalizePolaroid closure
   useEffect(() => { finalizePolaroidRef.current = finalizePolaroid; }, [finalizePolaroid]);
 
+  // ── Flash + shoot — pre-illuminates then captures ─────────────────
+  const flashAndShoot = useCallback(async () => {
+    if (flashMode === 'on') {
+      if (facingMode === 'user') {
+        // Front camera: use the screen as a flash (bright white overlay illuminates face)
+        setScreenFlashing(true);
+        await new Promise<void>(r => setTimeout(r, 220)); // let camera pick up the lit frame
+        shoot();
+        await new Promise<void>(r => setTimeout(r, 300)); // wait past shutter flash (160ms)
+        setScreenFlashing(false);
+      } else {
+        // Rear camera: use hardware LED torch
+        await setTorch(true);
+        shoot();
+        await new Promise<void>(r => setTimeout(r, 400));
+        await setTorch(false);
+      }
+    } else {
+      shoot();
+    }
+  }, [flashMode, facingMode, shoot, setTorch]);
+
+  // Keep ref in sync so countdown effect always calls the latest closure
+  useEffect(() => { flashAndShootRef.current = flashAndShoot; }, [flashAndShoot]);
+
   // ── Countdown ────────────────────────────────────────────────────
   useEffect(() => {
     if (countdown === null) return;
-    if (countdown === 0) { setCountdown(null); shoot(); return; }
+    if (countdown === 0) { setCountdown(null); flashAndShootRef.current?.(); return; }
     if (navigator.vibrate) navigator.vibrate(40); // subtle haptic per countdown tick
     const t = setTimeout(() => setCountdown(c => c !== null ? c - 1 : null), 1000);
     return () => clearTimeout(t);
-  }, [countdown, shoot]);
+  }, [countdown]); // flashAndShootRef is stable — no dep needed
 
   const handleShutterPress = useCallback(() => {
-    if (isComplete || flashing || permission !== 'granted' || countdown !== null || finalizing) return;
+    if (isComplete || flashing || permission !== 'granted' || countdown !== null || finalizing || screenFlashing) return;
     if (countdownSecs === 0) {
-      shoot();
+      flashAndShootRef.current?.();
     } else {
       setCountdown(countdownSecs);
     }
-  }, [isComplete, flashing, permission, countdown, countdownSecs, finalizing, shoot]);
+  }, [isComplete, flashing, permission, countdown, countdownSecs, finalizing, screenFlashing]);
 
   const statusText =
     count === 0       ? 'Richt de camera en druk op de knop 📸'
@@ -350,6 +393,21 @@ export default function CameraCapture({
   // ── Render ───────────────────────────────────────────────────────
   return (
     <section id="camera" className={`px-4 pb-16 max-w-md mx-auto ${topOffset}`}>
+
+      {/* ── Full-screen selfie flash overlay ─────────────────────── */}
+      <AnimatePresence>
+        {screenFlashing && (
+          <motion.div
+            key="screen-flash"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.08 }}
+            className="fixed inset-0 bg-white z-[500] pointer-events-none"
+          />
+        )}
+      </AnimatePresence>
+
       <motion.div
         initial={{ opacity: 0, y: 28 }}
         animate={{ opacity: 1, y: 0 }}
@@ -363,7 +421,7 @@ export default function CameraCapture({
           WebkitBackdropFilter: 'blur(24px)',
         }}
       >
-        {/* Flash overlay */}
+        {/* Flash overlay — shutter visual feedback */}
         <AnimatePresence>
           {flashing && (
             <motion.div key="flash"
@@ -506,7 +564,7 @@ export default function CameraCapture({
             style={{ display: permission === 'granted' ? 'block' : 'none' }}
           />
 
-          {/* Viewfinder corners */}
+          {/* Viewfinder corners + controls */}
           {permission === 'granted' && !isComplete && (
             <>
               <div className="absolute top-3 left-3 w-7 h-7 border-t-2 border-l-2 rounded-tl"
@@ -518,7 +576,39 @@ export default function CameraCapture({
               <div className="absolute bottom-3 right-3 w-7 h-7 border-b-2 border-r-2 rounded-br"
                 style={{ borderColor: `${accentColor}90` }} />
 
-              {/* Camera flip button */}
+              {/* Flash toggle button — bottom left */}
+              <button
+                onClick={() => setFlashMode(m => m === 'off' ? 'on' : 'off')}
+                aria-label={flashMode === 'on' ? 'Flits uitschakelen' : 'Flits inschakelen'}
+                className="absolute bottom-4 left-4 w-9 h-9 rounded-full flex items-center justify-center z-10 transition-all active:scale-90"
+                style={{
+                  background:     flashMode === 'on'
+                    ? 'rgba(255,220,0,0.22)'
+                    : 'rgba(7,22,47,0.55)',
+                  border:         flashMode === 'on'
+                    ? '1px solid rgba(255,220,0,0.5)'
+                    : '1px solid rgba(255,255,255,0.15)',
+                  backdropFilter: 'blur(8px)',
+                  boxShadow:      flashMode === 'on' ? '0 0 12px rgba(255,220,0,0.3)' : 'none',
+                }}
+              >
+                {flashMode === 'on' ? (
+                  // Lightning bolt filled — flash ON
+                  <svg width="15" height="17" viewBox="0 0 15 17" fill="none">
+                    <path d="M9 1L1.5 9.5H7L5.5 16L13.5 7H8L9 1Z" fill="#FFD700"/>
+                  </svg>
+                ) : (
+                  // Lightning bolt outline with diagonal slash — flash OFF
+                  <svg width="15" height="17" viewBox="0 0 15 17" fill="none">
+                    <path d="M9 1L1.5 9.5H7L5.5 16L13.5 7H8L9 1Z"
+                      stroke="rgba(255,255,255,0.45)" strokeWidth="1.3" strokeLinejoin="round"/>
+                    <line x1="1.5" y1="15.5" x2="13.5" y2="1.5"
+                      stroke="rgba(255,255,255,0.45)" strokeWidth="1.4" strokeLinecap="round"/>
+                  </svg>
+                )}
+              </button>
+
+              {/* Camera flip button — bottom right */}
               <button
                 onClick={switchCamera}
                 disabled={switching}
@@ -541,6 +631,28 @@ export default function CameraCapture({
                     stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
+
+              {/* Flash mode indicator — top center, only when flash is ON */}
+              <AnimatePresence>
+                {flashMode === 'on' && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+                    className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1 px-2.5 py-1 rounded-full z-10"
+                    style={{
+                      background: 'rgba(255,220,0,0.2)',
+                      border: '1px solid rgba(255,220,0,0.4)',
+                      backdropFilter: 'blur(8px)',
+                    }}
+                  >
+                    <svg width="9" height="11" viewBox="0 0 9 11" fill="none">
+                      <path d="M5.5 1L1 6H4.5L3.5 10L8 5H4.5L5.5 1Z" fill="#FFD700"/>
+                    </svg>
+                    <span className="text-[9px] font-black tracking-wider" style={{ color: '#FFD700' }}>
+                      {facingMode === 'user' ? 'SCREEN' : 'FLASH'}
+                    </span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </>
           )}
 
@@ -749,6 +861,13 @@ export default function CameraCapture({
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Status text */}
+          {!isComplete && (
+            <p className="text-center text-[11px] mt-3 font-medium" style={{ color: 'rgba(255,255,255,0.28)' }}>
+              {statusText}
+            </p>
+          )}
         </div>
 
         <canvas ref={canvasRef} className="hidden" aria-hidden />
