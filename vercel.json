@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/cleanup-reminder",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-photos",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}
