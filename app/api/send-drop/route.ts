@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { kv } from '@vercel/kv';
+import { put } from '@vercel/blob';
 import { prisma } from '@/lib/prisma';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -103,6 +104,11 @@ export async function POST(req: NextRequest) {
     contentType: 'image/jpeg' as const,
   }));
 
+  const base = (process.env.NEXT_PUBLIC_BASE_URL ?? 'https://festidrop.vercel.app').replace(/\/$/, '');
+  const galleryUrl = event?.id && slug
+    ? `${base}/gallery/${slug}?email=${encodeURIComponent(normalizedEmail)}`
+    : null;
+
   const logoBlock = logoUrl
     ? `<tr><td align="center" style="padding-bottom:24px;">
         <img src="${logoUrl}" alt="${eventName}" height="52"
@@ -149,10 +155,23 @@ export async function POST(req: NextRequest) {
             ${photos.length} foto's bijgevoegd
           </p>
           <p style="margin:0;font-size:13px;color:#6C7A8D;line-height:1.6;">
-            Open de bijlagen om jouw festivalmomenten te bekijken.<br>
-            Dit is de enige plek waar je ze kunt zien — bewaar ze goed!
+            Open de bijlagen om jouw festivalmomenten te bekijken.
           </p>
         </td></tr>
+
+        ${galleryUrl ? `
+        <!-- Gallery CTA -->
+        <tr><td align="center" style="padding-top:20px;">
+          <a href="${galleryUrl}"
+            style="display:inline-block;background:${accentColor};color:#ffffff;
+                   padding:14px 32px;border-radius:14px;text-decoration:none;
+                   font-weight:800;font-size:14px;letter-spacing:-0.01em;">
+            🎞️&nbsp; Bekijk jouw filmrol
+          </a>
+          <p style="margin:10px 0 0;font-size:11px;color:#A7B1C2;">
+            Jouw foto's blijven 30 dagen beschikbaar via deze link
+          </p>
+        </td></tr>` : ''}
 
         <!-- Footer -->
         <tr><td align="center" style="padding-top:24px;">
@@ -190,12 +209,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Resend: ${error.message}` }, { status: 500 });
     }
 
-    // ── Log drop in DB ───────────────────────────────────────────────
+    // ── Log drop in DB + upload photos to Blob ───────────────────────
     if (event?.id) {
       try {
-        await prisma.drop.create({
+        const drop = await prisma.drop.create({
           data: { eventId: event.id, email: normalizedEmail },
         });
+
+        // Upload photos to Vercel Blob (best-effort, parallel)
+        try {
+          const uploads = await Promise.allSettled(
+            photos.map(async (dataUrl, i) => {
+              const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+              const buffer = Buffer.from(base64, 'base64');
+              const { url } = await put(
+                `drops/${drop.id}/${i}.jpg`,
+                buffer,
+                { access: 'public', contentType: 'image/jpeg' }
+              );
+              return { url, order: i };
+            })
+          );
+          const photoRecords = uploads
+            .filter((r): r is PromiseFulfilledResult<{ url: string; order: number }> => r.status === 'fulfilled')
+            .map(r => ({ dropId: drop.id, url: r.value.url, order: r.value.order }));
+          if (photoRecords.length > 0) {
+            await prisma.photo.createMany({ data: photoRecords });
+          }
+        } catch {
+          console.warn('[send-drop] Blob upload mislukt — gallery niet beschikbaar');
+        }
       } catch {
         console.warn('[send-drop] Drop logging mislukt');
       }

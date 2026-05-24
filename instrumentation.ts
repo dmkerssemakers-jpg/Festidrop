@@ -95,6 +95,31 @@ export async function register() {
       END $$
     `;
 
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "Photo" (
+        "id"        TEXT NOT NULL,
+        "dropId"    TEXT NOT NULL,
+        "url"       TEXT NOT NULL,
+        "order"     INTEGER NOT NULL DEFAULT 0,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "Photo_pkey" PRIMARY KEY ("id")
+      )
+    `;
+
+    await prisma.$executeRaw`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'Photo_dropId_fkey'
+        ) THEN
+          ALTER TABLE "Photo"
+            ADD CONSTRAINT "Photo_dropId_fkey"
+            FOREIGN KEY ("dropId") REFERENCES "Drop"("id")
+            ON DELETE CASCADE ON UPDATE CASCADE;
+        END IF;
+      END $$
+    `;
+
     console.log('[migration] schema up to date');
   } catch (err) {
     console.error('[migration] failed:', err);

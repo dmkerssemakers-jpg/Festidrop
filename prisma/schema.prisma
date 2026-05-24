@@ -49,6 +49,16 @@ model Drop {
   email   String
   sentAt  DateTime @default(now())
   event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  photos  Photo[]
+}
+
+model Photo {
+  id        String   @id @default(cuid())
+  dropId    String
+  drop      Drop     @relation(fields: [dropId], references: [id], onDelete: Cascade)
+  url       String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
 }
 
 model Whitelist {
