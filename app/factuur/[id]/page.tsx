@@ -131,7 +131,7 @@ export default async function PrintInvoicePage({ params }: { params: Promise<{ i
                 ))}
               </div>
 
-              {invoice.lines.map((line, idx) => (
+              {invoice.lines.map((line: LineRow, idx: number) => (
                 <div
                   key={line.id}
                   style={{
