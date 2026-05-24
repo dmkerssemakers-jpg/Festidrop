@@ -96,6 +96,10 @@ export default function EmailDropCard({ photos, onSent, slug, accentColor = '#1E
     if (!email || state === 'sending') return;
     setState('sending');
     setErrorMsg('');
+
+    const controller = new AbortController();
+    const timeout    = setTimeout(() => controller.abort(), 25_000); // 25s timeout
+
     try {
       // Compress before sending to stay well under Vercel's 4.5 MB request limit
       const compressed = await Promise.all(photos.map(compressForEmail));
@@ -104,14 +108,21 @@ export default function EmailDropCard({ photos, onSent, slug, accentColor = '#1E
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, photos: compressed, slug }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Onbekende fout');
       setState('sent');
       onSent?.();
     } catch (err: unknown) {
+      clearTimeout(timeout);
       setState('error');
-      setErrorMsg(err instanceof Error ? err.message : 'Probeer het opnieuw.');
+      const isTimeout = err instanceof Error && err.name === 'AbortError';
+      setErrorMsg(isTimeout
+        ? 'Verbinding te traag. Controleer je internet en probeer opnieuw.'
+        : err instanceof Error ? err.message : 'Probeer het opnieuw.'
+      );
     }
   }
 
@@ -180,7 +191,7 @@ export default function EmailDropCard({ photos, onSent, slug, accentColor = '#1E
               className="text-[12px] font-semibold mb-6"
               style={{ color: `${accentColor}CC` }}
             >
-              De foto&apos;s zijn alleen via je mail te zien. ✦
+              Je krijgt ook een link naar jouw persoonlijke filmrol. 🎞️
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-3">
@@ -304,6 +315,20 @@ export default function EmailDropCard({ photos, onSent, slug, accentColor = '#1E
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
               className="mt-6 flex flex-col gap-2 items-center w-full"
             >
+              {/* Gallery link — shows filmrol directly */}
+              {slug && (
+                <a
+                  href={`/gallery/${slug}?email=${encodeURIComponent(email)}`}
+                  className="flex items-center justify-center gap-2 w-full py-3.5 rounded-full text-sm font-black text-white transition-all hover:opacity-90 active:scale-[0.97]"
+                  style={{
+                    background: `linear-gradient(135deg, ${accentColor}, ${accentColor}BB)`,
+                    boxShadow:  `0 8px 24px ${accentColor}40`,
+                  }}
+                >
+                  🎞️ Bekijk jouw filmrol
+                </a>
+              )}
+
               {/* Share button — uses Web Share API if available */}
               <ShareButton accentColor={accentColor} />
 
