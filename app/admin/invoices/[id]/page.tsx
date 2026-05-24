@@ -148,7 +148,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
             </div>
 
             <div className="space-y-1">
-              {invoice.lines.map(line => (
+              {invoice.lines.map((line: LineRow) => (
                 <div
                   key={line.id}
                   className="grid gap-3 py-2.5 px-3 rounded-xl"
