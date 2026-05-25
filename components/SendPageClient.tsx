@@ -14,9 +14,11 @@ interface Props {
 }
 
 export default function SendPageClient({ slug, accentColor, eventName, logoUrl }: Props) {
-  const [photos, setPhotos] = useState<string[] | null>(null);
-  const router   = useRouter();
+  const [photos,       setPhotos]       = useState<string[] | null>(null);
+  const [defaultEmail, setDefaultEmail] = useState('');
+  const router     = useRouter();
   const storageKey = `festidrop_photos_${slug}`;
+  const pendingKey = `festidrop_pending_${slug}`;
 
   useEffect(() => {
     try {
@@ -26,14 +28,25 @@ export default function SendPageClient({ slug, accentColor, eventName, logoUrl }
       const parsed = JSON.parse(stored) as string[];
       if (!Array.isArray(parsed) || parsed.length === 0) { router.replace(`/${slug}`); return; }
       setPhotos(parsed);
+
+      // Restore email from pending queue so the form is pre-filled on return
+      try {
+        const pending = localStorage.getItem(pendingKey);
+        if (pending) {
+          const { email } = JSON.parse(pending) as { email: string };
+          if (email) setDefaultEmail(email);
+        }
+      } catch { /* noop */ }
     } catch {
       router.replace(`/${slug}`);
     }
-  }, [router, slug, storageKey]);
+  }, [router, slug, storageKey, pendingKey]);
 
   function handleSent() {
+    // Clear photos and the pending queue entry on successful send
     try { localStorage.removeItem(storageKey); } catch { /* noop */ }
     try { sessionStorage.removeItem(storageKey); } catch { /* noop */ }
+    try { localStorage.removeItem(pendingKey); } catch { /* noop */ }
   }
 
   if (!photos) {
@@ -210,6 +223,7 @@ export default function SendPageClient({ slug, accentColor, eventName, logoUrl }
             accentColor={accentColor}
             eventName={eventName}
             logoUrl={logoUrl}
+            defaultEmail={defaultEmail}
           />
         </motion.div>
       </div>

@@ -1,15 +1,16 @@
 'use client';
-import { useState } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type Props = {
-  photos:       string[];
-  onSent?:      () => void;
-  slug?:        string;
-  accentColor?: string;
-  eventName?:   string;
-  logoUrl?:     string;
+  photos:        string[];
+  onSent?:       () => void;
+  slug?:         string;
+  accentColor?:  string;
+  eventName?:    string;
+  logoUrl?:      string;
+  defaultEmail?: string; // pre-fill when retrying from a pending queue item
 };
 
 // Compress a photo before sending to API.
@@ -29,30 +30,38 @@ function compressForEmail(dataUrl: string): Promise<string> {
       c.getContext('2d')!.drawImage(img, 0, 0, w, h);
       resolve(c.toDataURL('image/jpeg', 0.86));
     };
-    img.onerror = () => resolve(dataUrl); // fallback: send original
+    img.onerror = () => resolve(dataUrl);
     img.src = dataUrl;
   });
 }
 
-type State = 'idle' | 'sending' | 'sent' | 'error';
+// ── Queue helpers (photos are already in localStorage as festidrop_photos_{slug}) ──
+function getPendingKey(slug?: string) {
+  return slug ? `festidrop_pending_${slug}` : null;
+}
+function savePending(slug: string | undefined, emailVal: string) {
+  const key = getPendingKey(slug);
+  if (!key) return;
+  try { localStorage.setItem(key, JSON.stringify({ email: emailVal, ts: Date.now() })); } catch { /* noop */ }
+}
+function clearPending(slug: string | undefined) {
+  const key = getPendingKey(slug);
+  if (!key) return;
+  try { localStorage.removeItem(key); } catch { /* noop */ }
+}
+
+type State = 'idle' | 'sending' | 'sent' | 'error' | 'queued';
 
 function ShareButton({ accentColor }: { accentColor: string }) {
   const [shared, setShared] = useState(false);
-
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
   if (!canShare) return null;
 
   const handleShare = async () => {
     try {
-      await navigator.share({
-        title: 'Mijn FestiDrop 📸',
-        text: 'Check mijn festivalfoto\'s via FestiDrop!',
-        url: window.location.origin,
-      });
+      await navigator.share({ title: 'Mijn FestiDrop 📸', text: 'Check mijn festivalfoto\'s via FestiDrop!', url: window.location.origin });
       setShared(true);
-    } catch {
-      // User cancelled — no action needed
-    }
+    } catch { /* user cancelled */ }
   };
 
   return (
@@ -87,56 +96,121 @@ function ShareButton({ accentColor }: { accentColor: string }) {
   );
 }
 
-export default function EmailDropCard({ photos, onSent, slug, accentColor = '#1E8BFF', eventName, logoUrl }: Props) {
-  const router = useRouter();
-  const [email,    setEmail]    = useState('');
+export default function EmailDropCard({
+  photos,
+  onSent,
+  slug,
+  accentColor = '#1E8BFF',
+  eventName,
+  logoUrl,
+  defaultEmail = '',
+}: Props) {
+  const router     = useRouter();
+  const [email,    setEmail]    = useState(defaultEmail);
   const [state,    setState]    = useState<State>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [consent,  setConsent]  = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email || state === 'sending') return;
+  // Stable ref for retry so effects don't capture stale closures
+  const retryRef = useRef<(() => void) | null>(null);
+
+  // ── Core send logic (shared by first submit and retries) ────────
+  const performSend = useCallback(async (emailVal: string) => {
     setState('sending');
     setErrorMsg('');
 
     const controller = new AbortController();
-    const timeout    = setTimeout(() => controller.abort(), 25_000); // 25s timeout
+    const timer = setTimeout(() => controller.abort(), 25_000);
 
     try {
-      // Compress before sending to stay well under Vercel's 4.5 MB request limit
       const compressed = await Promise.all(photos.map(compressForEmail));
-
       const res  = await fetch('/api/send-drop', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, photos: compressed, slug }),
-        signal: controller.signal,
+        body:    JSON.stringify({ email: emailVal, photos: compressed, slug }),
+        signal:  controller.signal,
       });
-      clearTimeout(timeout);
+      clearTimeout(timer);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Onbekende fout');
+
+      // Success — clean up any pending queue entry
+      clearPending(slug);
       setState('sent');
       onSent?.();
     } catch (err: unknown) {
-      clearTimeout(timeout);
-      setState('error');
-      const isTimeout = err instanceof Error && err.name === 'AbortError';
-      setErrorMsg(isTimeout
-        ? 'Verbinding te traag. Controleer je internet en probeer opnieuw.'
-        : err instanceof Error ? err.message : 'Probeer het opnieuw.'
-      );
+      clearTimeout(timer);
+      const isNetwork =
+        err instanceof TypeError ||
+        (err instanceof Error && (err.name === 'AbortError' || err.message === 'Failed to fetch'));
+
+      if (isNetwork) {
+        // Save to offline queue — photos are already in localStorage
+        savePending(slug, emailVal);
+        setState('queued');
+      } else {
+        setState('error');
+        setErrorMsg(err instanceof Error ? err.message : 'Probeer het opnieuw.');
+      }
     }
+  }, [photos, slug, onSent]);
+
+  // Keep ref in sync
+  useEffect(() => {
+    retryRef.current = () => {
+      if (state === 'sending') return;
+      performSend(email);
+    };
+  }, [state, email, performSend]);
+
+  // ── Auto-retry when connection is restored ───────────────────────
+  useEffect(() => {
+    if (state !== 'queued') return;
+
+    const retry = () => {
+      if (navigator.onLine) retryRef.current?.();
+    };
+
+    window.addEventListener('online', retry);
+    // Also poll every 30 s in case the online event doesn't fire reliably
+    const interval = setInterval(retry, 30_000);
+
+    return () => {
+      window.removeEventListener('online', retry);
+      clearInterval(interval);
+    };
+  }, [state]);
+
+  // ── First submit ────────────────────────────────────────────────
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email || state === 'sending') return;
+    await performSend(email);
   }
+
+  // ── Direct download as offline fallback ─────────────────────────
+  const downloadPhotos = useCallback(async () => {
+    setDownloading(true);
+    const name = slug ?? 'festidrop';
+    for (let i = 0; i < photos.length; i++) {
+      const a    = document.createElement('a');
+      a.href     = photos[i];
+      a.download = `${name}-${String(i + 1).padStart(2, '0')}.jpg`;
+      a.click();
+      await new Promise(r => setTimeout(r, 350));
+    }
+    setDownloading(false);
+  }, [photos, slug]);
 
   return (
     <div
       className="relative rounded-[28px] overflow-hidden"
       style={{
-        background:       'rgba(7,22,47,0.88)',
-        border:           '1px solid rgba(255,255,255,0.07)',
-        boxShadow:        `0 32px 80px rgba(7,22,47,0.28), 0 0 80px ${accentColor}18`,
-        backdropFilter:   'blur(24px)',
+        background:           'rgba(7,22,47,0.88)',
+        border:               '1px solid rgba(255,255,255,0.07)',
+        boxShadow:            `0 32px 80px rgba(7,22,47,0.28), 0 0 80px ${accentColor}18`,
+        backdropFilter:       'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
       }}
     >
@@ -147,7 +221,105 @@ export default function EmailDropCard({ photos, onSent, slug, accentColor = '#1E
       />
 
       <AnimatePresence mode="wait">
-        {state !== 'sent' ? (
+
+        {/* ── Queued (offline) state ──────────────────────────── */}
+        {state === 'queued' && (
+          <motion.div
+            key="queued"
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            className="p-7 text-center"
+          >
+            {/* Pulsing signal icon */}
+            <div className="flex justify-center mb-5">
+              <motion.div
+                className="relative w-20 h-20 rounded-full flex items-center justify-center"
+                style={{ background: 'rgba(255,180,0,0.12)', border: '1.5px solid rgba(255,180,0,0.25)' }}
+              >
+                {/* Outer rings */}
+                {[1.4, 1.7].map((scale, i) => (
+                  <motion.div
+                    key={i}
+                    className="absolute inset-0 rounded-full"
+                    style={{ border: '1px solid rgba(255,180,0,0.2)' }}
+                    animate={{ scale: [1, scale, scale], opacity: [1, 0, 0] }}
+                    transition={{ duration: 1.8, repeat: Infinity, delay: i * 0.4, ease: 'easeOut' }}
+                  />
+                ))}
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                  {/* Signal bars */}
+                  <path d="M4 24 Q16 8 28 24" stroke="rgba(255,180,0,0.25)" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+                  <path d="M8 24 Q16 12 24 24" stroke="rgba(255,180,0,0.4)" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+                  <path d="M12 24 Q16 16 20 24" stroke="rgba(255,180,0,0.7)" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
+                  <circle cx="16" cy="24" r="2" fill="#FFB400"/>
+                </svg>
+              </motion.div>
+            </div>
+
+            <h2 className="text-[22px] font-black text-white mb-2 tracking-[-0.03em]">
+              Geen bereik
+            </h2>
+            <p className="text-sm leading-relaxed mb-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
+              Je drop staat klaar voor <span className="text-white font-bold">{email}</span>.
+            </p>
+            <p className="text-sm leading-relaxed mb-6" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              Wordt <span style={{ color: '#FFB400' }}>automatisch verstuurd</span> zodra je weer bereik hebt — ook als je de pagina sluit en terugkomt.
+            </p>
+
+            {/* Retry indicator */}
+            <div
+              className="flex items-center justify-center gap-2 mb-5 py-2 rounded-full"
+              style={{ background: 'rgba(255,180,0,0.08)', border: '1px solid rgba(255,180,0,0.15)' }}
+            >
+              <motion.div
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ background: '#FFB400' }}
+                animate={{ opacity: [1, 0.2, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              />
+              <span className="text-[11px] font-bold" style={{ color: 'rgba(255,180,0,0.7)' }}>
+                Wacht op verbinding · probeert elke 30 seconden
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              {/* Manual retry */}
+              <button
+                onClick={() => performSend(email)}
+                className="w-full py-3.5 rounded-full text-sm font-black text-white transition-all active:scale-[0.97]"
+                style={{
+                  background: `linear-gradient(135deg, ${accentColor}, ${accentColor}CC)`,
+                  boxShadow:  `0 8px 24px ${accentColor}30`,
+                }}
+              >
+                Probeer nu opnieuw →
+              </button>
+
+              {/* Direct download fallback */}
+              <button
+                onClick={downloadPhotos}
+                disabled={downloading}
+                className="w-full py-3 rounded-full text-sm font-bold transition-all active:scale-[0.97] disabled:opacity-60"
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  border:     '1px solid rgba(255,255,255,0.12)',
+                  color:      'rgba(255,255,255,0.7)',
+                }}
+              >
+                {downloading ? '⏳ Bezig…' : `📥 Download ${photos.length} foto's direct naar je telefoon`}
+              </button>
+            </div>
+
+            <p className="text-[10px] mt-4" style={{ color: 'rgba(255,255,255,0.22)' }}>
+              Je e-mailadres is opgeslagen. Keer terug naar deze pagina met bereik en je drop gaat automatisch weg.
+            </p>
+          </motion.div>
+        )}
+
+        {/* ── Form state (idle, sending, error) ───────────────── */}
+        {(state === 'idle' || state === 'sending' || state === 'error') && (
           <motion.div
             key="form"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, y: -8 }}
@@ -172,7 +344,6 @@ export default function EmailDropCard({ photos, onSent, slug, accentColor = '#1E
                   className="w-16 h-16 rounded-2xl flex items-center justify-center"
                   style={{ background: `${accentColor}15`, border: `1px solid ${accentColor}30` }}
                 >
-                  {/* Camera icon */}
                   <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
                     <rect x="2" y="8" width="24" height="17" rx="4" stroke={accentColor} strokeWidth="1.8"/>
                     <circle cx="14" cy="16.5" r="5" stroke={accentColor} strokeWidth="1.8"/>
@@ -190,10 +361,7 @@ export default function EmailDropCard({ photos, onSent, slug, accentColor = '#1E
               <span className="font-bold text-white">{photos.length} polaroid{photos.length !== 1 ? 's' : ''}</span>{' '}
               direct in je inbox.
             </p>
-            <p
-              className="text-[12px] font-semibold mb-6"
-              style={{ color: `${accentColor}CC` }}
-            >
+            <p className="text-[12px] font-semibold mb-6" style={{ color: `${accentColor}CC` }}>
               Je krijgt ook een link naar jouw persoonlijke filmrol. 🎞️
             </p>
 
@@ -207,10 +375,10 @@ export default function EmailDropCard({ photos, onSent, slug, accentColor = '#1E
                 disabled={state === 'sending'}
                 className="w-full px-5 py-3.5 rounded-full text-sm font-medium placeholder:font-normal focus:outline-none transition disabled:opacity-50"
                 style={{
-                  background:    'rgba(255,255,255,0.07)',
-                  border:        '1px solid rgba(255,255,255,0.12)',
-                  color:         '#fff',
-                  caretColor:    accentColor,
+                  background: 'rgba(255,255,255,0.07)',
+                  border:     '1px solid rgba(255,255,255,0.12)',
+                  color:      '#fff',
+                  caretColor: accentColor,
                 }}
                 onFocus={e => { e.target.style.borderColor = `${accentColor}80`; e.target.style.background = 'rgba(255,255,255,0.10)'; }}
                 onBlur={e  => { e.target.style.borderColor = 'rgba(255,255,255,0.12)'; e.target.style.background = 'rgba(255,255,255,0.07)'; }}
@@ -239,8 +407,8 @@ export default function EmailDropCard({ photos, onSent, slug, accentColor = '#1E
                 whileTap={state !== 'sending' ? { scale: 0.97 } : {}}
                 className="w-full py-4 rounded-full text-sm font-black text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 style={{
-                  background:  `linear-gradient(135deg, ${accentColor}, ${accentColor}CC)`,
-                  boxShadow:   state === 'sending' ? 'none' : `0 10px 30px ${accentColor}40`,
+                  background: `linear-gradient(135deg, ${accentColor}, ${accentColor}CC)`,
+                  boxShadow:  state === 'sending' ? 'none' : `0 10px 30px ${accentColor}40`,
                 }}
               >
                 {state === 'sending' ? (
@@ -269,11 +437,28 @@ export default function EmailDropCard({ photos, onSent, slug, accentColor = '#1E
               </motion.p>
             )}
 
-            <p className="text-[11px] mt-4 font-medium" style={{ color: 'rgba(255,255,255,0.28)' }}>
+            {/* Always-visible download fallback */}
+            <button
+              onClick={downloadPhotos}
+              disabled={downloading}
+              className="mt-3 w-full py-2.5 rounded-full text-[11px] font-bold transition-all active:scale-[0.97] disabled:opacity-50"
+              style={{
+                background: 'rgba(255,255,255,0.04)',
+                border:     '1px solid rgba(255,255,255,0.08)',
+                color:      'rgba(255,255,255,0.35)',
+              }}
+            >
+              {downloading ? '⏳ Bezig…' : '📥 Geen bereik? Download foto\'s direct'}
+            </button>
+
+            <p className="text-[11px] mt-3 font-medium" style={{ color: 'rgba(255,255,255,0.28)' }}>
               We sturen alleen jouw foto&apos;s. Geen spam.
             </p>
           </motion.div>
-        ) : (
+        )}
+
+        {/* ── Success state ───────────────────────────────────── */}
+        {state === 'sent' && (
           <motion.div
             key="success"
             initial={{ opacity: 0, scale: 0.95, y: 12 }}
@@ -289,7 +474,6 @@ export default function EmailDropCard({ photos, onSent, slug, accentColor = '#1E
               animate={{ scale: 1 }}
               transition={{ type: 'spring', stiffness: 300, damping: 18, delay: 0.05 }}
             >
-              {/* Outer ring pulse */}
               <motion.div
                 className="absolute inset-0 rounded-full"
                 style={{ border: `2px solid ${accentColor}40` }}
@@ -335,7 +519,6 @@ export default function EmailDropCard({ photos, onSent, slug, accentColor = '#1E
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
               className="mt-6 flex flex-col gap-2 items-center w-full"
             >
-              {/* Gallery link — shows filmrol directly */}
               {slug && (
                 <a
                   href={`/gallery/${slug}?email=${encodeURIComponent(email)}`}
@@ -349,7 +532,6 @@ export default function EmailDropCard({ photos, onSent, slug, accentColor = '#1E
                 </a>
               )}
 
-              {/* Share button — uses Web Share API if available */}
               <ShareButton accentColor={accentColor} />
 
               <button
@@ -369,6 +551,7 @@ export default function EmailDropCard({ photos, onSent, slug, accentColor = '#1E
             </motion.div>
           </motion.div>
         )}
+
       </AnimatePresence>
     </div>
   );
