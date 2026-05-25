@@ -120,6 +120,9 @@ export async function register() {
       END $$
     `;
 
+    // Marketing consent opt-in (added for app-launch funnel)
+    await prisma.$executeRaw`ALTER TABLE "Drop" ADD COLUMN IF NOT EXISTS "marketingConsent" BOOLEAN NOT NULL DEFAULT false`;
+
     console.log('[migration] schema up to date');
   } catch (err) {
     console.error('[migration] failed:', err);

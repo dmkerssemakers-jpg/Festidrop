@@ -106,11 +106,12 @@ export default function EmailDropCard({
   defaultEmail = '',
 }: Props) {
   const router     = useRouter();
-  const [email,    setEmail]    = useState(defaultEmail);
-  const [state,    setState]    = useState<State>('idle');
-  const [errorMsg, setErrorMsg] = useState('');
-  const [consent,  setConsent]  = useState(false);
-  const [downloading, setDownloading] = useState(false);
+  const [email,           setEmail]           = useState(defaultEmail);
+  const [state,           setState]           = useState<State>('idle');
+  const [errorMsg,        setErrorMsg]        = useState('');
+  const [consent,         setConsent]         = useState(false);
+  const [marketingOptIn,  setMarketingOptIn]  = useState(false);
+  const [downloading,     setDownloading]     = useState(false);
 
   // Stable ref for retry so effects don't capture stale closures
   const retryRef = useRef<(() => void) | null>(null);
@@ -128,7 +129,7 @@ export default function EmailDropCard({
       const res  = await fetch('/api/send-drop', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ email: emailVal, photos: compressed, slug }),
+        body:    JSON.stringify({ email: emailVal, photos: compressed, slug, marketingConsent: marketingOptIn }),
         signal:  controller.signal,
       });
       clearTimeout(timer);
@@ -384,7 +385,7 @@ export default function EmailDropCard({
                 onBlur={e  => { e.target.style.borderColor = 'rgba(255,255,255,0.12)'; e.target.style.background = 'rgba(255,255,255,0.07)'; }}
               />
 
-              {/* Consent checkbox */}
+              {/* Verplichte privacy consent */}
               <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', textAlign: 'left' }}>
                 <input
                   type="checkbox"
@@ -398,6 +399,20 @@ export default function EmailDropCard({
                   <a href="/privacy" target="_blank" style={{ color: `${accentColor}99`, textDecoration: 'underline' }}>
                     Privacybeleid
                   </a>
+                </span>
+              </label>
+
+              {/* Optionele marketing opt-in */}
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', textAlign: 'left' }}>
+                <input
+                  type="checkbox"
+                  checked={marketingOptIn}
+                  onChange={e => setMarketingOptIn(e.target.checked)}
+                  disabled={state === 'sending'}
+                  style={{ marginTop: 2, accentColor, flexShrink: 0, width: 16, height: 16, cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
+                  Ja, houd mij op de hoogte van FestiDrop nieuws en nieuwe festivals. <span style={{ color: 'rgba(255,255,255,0.2)' }}>(optioneel)</span>
                 </span>
               </label>
 

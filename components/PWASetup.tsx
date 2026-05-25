@@ -40,7 +40,8 @@ export default function PWASetup() {
     if (sessionStorage.getItem('pwa-dismissed')) return;
 
     // Detect iOS (no beforeinstallprompt, manual add-to-homescreen needed)
-    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) && !window.MSStream;
+    // MSStream check removed — IE11/Windows Phone are dead
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
     if (isIOS) {
       // Show iOS tip after a short delay

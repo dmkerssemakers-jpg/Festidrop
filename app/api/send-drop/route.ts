@@ -24,10 +24,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const { email, photos, slug } = (await req.json()) as {
+  const { email, photos, slug, marketingConsent } = (await req.json()) as {
     email: string;
     photos: string[];
     slug?: string;
+    marketingConsent?: boolean;
   };
 
   if (!email || !Array.isArray(photos) || photos.length === 0) {
@@ -215,7 +216,11 @@ export async function POST(req: NextRequest) {
     if (event?.id) {
       try {
         const drop = await prisma.drop.create({
-          data: { eventId: event.id, email: normalizedEmail },
+          data: {
+            eventId:         event.id,
+            email:           normalizedEmail,
+            marketingConsent: marketingConsent === true,
+          },
         });
 
         // Upload photos to Vercel Blob (best-effort, parallel)

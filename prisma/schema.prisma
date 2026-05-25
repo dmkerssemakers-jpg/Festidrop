@@ -44,12 +44,13 @@ model Event {
 }
 
 model Drop {
-  id      String   @id @default(cuid())
-  eventId String
-  email   String
-  sentAt  DateTime @default(now())
-  event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  photos  Photo[]
+  id              String   @id @default(cuid())
+  eventId         String
+  email           String
+  sentAt          DateTime @default(now())
+  marketingConsent Boolean @default(false)
+  event           Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  photos          Photo[]
 }
 
 model Photo {
