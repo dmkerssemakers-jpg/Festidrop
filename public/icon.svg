@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#07162F"/>
+  <!-- Camera body -->
+  <rect x="80" y="168" width="352" height="240" rx="32" fill="none" stroke="white" stroke-width="24"/>
+  <!-- Lens outer -->
+  <circle cx="256" cy="288" r="80" fill="none" stroke="white" stroke-width="24"/>
+  <!-- Lens inner (filled) -->
+  <circle cx="256" cy="288" r="40" fill="white"/>
+  <!-- Viewfinder bump -->
+  <path d="M176 168v-40a40 40 0 0140-40h80a40 40 0 0140 40v40" fill="none" stroke="white" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Flash dot -->
+  <circle cx="394" cy="214" r="16" fill="white"/>
+</svg>

@@ -1,0 +1,27 @@
+{
+  "name": "FestiDrop",
+  "short_name": "FestiDrop",
+  "description": "Maak polaroid-foto's en ontvang ze direct per e-mail.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07162F",
+  "theme_color": "#07162F",
+  "orientation": "portrait-primary",
+  "lang": "nl",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [],
+  "categories": ["photo", "social", "entertainment"]
+}
