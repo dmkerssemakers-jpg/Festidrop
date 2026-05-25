@@ -46,25 +46,28 @@ export default async function ClientsPage() {
       {/* ── Stat cards ─────────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
-          { label: 'Klanten',          value: clients.length, color: '#1E8BFF',
+          { label: 'Klanten',          value: clients.length, color: '#1E8BFF', grad: 'linear-gradient(135deg,#1E8BFF,#20D6E8)',
             icon: <><circle cx="7" cy="5.5" r="2.5" stroke="currentColor" strokeWidth="1.4"/><path d="M2 13c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></> },
-          { label: 'Events gekoppeld', value: totalEvents,    color: '#7B2FF7',
+          { label: 'Events gekoppeld', value: totalEvents,    color: '#7B2FF7', grad: 'linear-gradient(135deg,#7B2FF7,#1E8BFF)',
             icon: <><rect x="1.5" y="3" width="11" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M4.5 3V2M9.5 3V2M1.5 6h11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></> },
-          { label: 'Drops totaal',     value: totalDrops,     color: '#00C896',
+          { label: 'Drops totaal',     value: totalDrops,     color: '#007A5E', grad: 'linear-gradient(135deg,#00C896,#00A878)',
             icon: <><rect x="2" y="6" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><circle cx="7" cy="9.5" r="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M5 6V4.5a2 2 0 014 0V6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></> },
-        ].map(({ label, value, color, icon }) => (
+        ].map(({ label, value, color, grad, icon }) => (
           <div
             key={label}
-            className="rounded-2xl p-4 flex items-center gap-3"
-            style={{ background: 'rgba(255,255,255,0.85)', border: '1px solid rgba(189,239,255,0.55)', boxShadow: '0 2px 12px rgba(7,22,47,0.04)' }}
+            className="rounded-2xl overflow-hidden"
+            style={{ background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(189,239,255,0.55)', boxShadow: '0 2px 12px rgba(7,22,47,0.04)' }}
           >
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-              style={{ background: `${color}15`, color }}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">{icon}</svg>
-            </div>
-            <div>
-              <p className="text-2xl font-black leading-none" style={{ color, letterSpacing: '-0.04em' }}>{value}</p>
-              <p className="text-[10px] text-muted font-medium mt-0.5">{label}</p>
+            <div className="h-1" style={{ background: grad }} />
+            <div className="p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: `${color}15`, color }}>
+                <svg width="15" height="15" viewBox="0 0 14 14" fill="none">{icon}</svg>
+              </div>
+              <div>
+                <p className="text-xl font-black leading-none tabular-nums" style={{ color, letterSpacing: '-0.04em' }}>{value}</p>
+                <p className="text-[11px] text-muted font-medium mt-1">{label}</p>
+              </div>
             </div>
           </div>
         ))}

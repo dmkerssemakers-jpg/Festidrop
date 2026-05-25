@@ -1,5 +1,5 @@
 'use client';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 interface Photo {
   id:    string;
@@ -26,10 +26,22 @@ export default function GalleryView({ event, photos, email, oldestSentAt }: { ev
   const [copied,   setCopied]     = useState(false);
   const [dlAll,    setDlAll]      = useState(false);
 
-  const openLightbox = (idx: number) => setLightbox(idx);
-  const closeLightbox = () => setLightbox(null);
-  const prev = () => setLightbox(i => (i != null && i > 0) ? i - 1 : i);
-  const next = () => setLightbox(i => (i != null && i < photos.length - 1) ? i + 1 : i);
+  const openLightbox  = (idx: number) => setLightbox(idx);
+  const closeLightbox = useCallback(() => setLightbox(null), []);
+  const prev = useCallback(() => setLightbox(i => (i != null && i > 0) ? i - 1 : i), []);
+  const next = useCallback(() => setLightbox(i => (i != null && i < photos.length - 1) ? i + 1 : i), [photos.length]);
+
+  // Keyboard navigation in lightbox
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (lightbox === null) return;
+      if (e.key === 'Escape')      closeLightbox();
+      if (e.key === 'ArrowLeft')   prev();
+      if (e.key === 'ArrowRight')  next();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [lightbox, closeLightbox, prev, next]);
 
   const shareLink = useCallback(() => {
     navigator.clipboard.writeText(window.location.href).then(() => {
@@ -295,6 +307,11 @@ export default function GalleryView({ event, photos, email, oldestSentAt }: { ev
             onClick={closeLightbox}
             style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', borderRadius: '50%', width: 40, height: 40, fontSize: 18, cursor: 'pointer' }}
           >×</button>
+
+          {/* Keyboard hint */}
+          <p style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', fontSize: 11, color: 'rgba(255,255,255,0.25)', whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+            ← → navigeren · Esc sluiten
+          </p>
         </div>
       )}
     </div>
