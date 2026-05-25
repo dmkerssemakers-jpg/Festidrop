@@ -209,6 +209,23 @@ export async function deleteInvoice(id: string) {
   redirect('/admin/invoices');
 }
 
+// ── Settings ─────────────────────────────────────────────────────────────────
+import { COMPANY_KEYS } from '@/lib/settings';
+
+export async function saveSettings(formData: FormData) {
+  await Promise.all(
+    COMPANY_KEYS.map(k => {
+      const value = ((formData.get(`company.${k}`) as string) ?? '').trim();
+      return prisma.setting.upsert({
+        where:  { key: `company.${k}` },
+        create: { key: `company.${k}`, value },
+        update: { value },
+      });
+    })
+  );
+  revalidatePath('/admin/settings');
+}
+
 // ── Whitelist ────────────────────────────────────────────────────────────────
 export async function addWhitelist(eventId: string, email: string) {
   const normalized = email.trim().toLowerCase();

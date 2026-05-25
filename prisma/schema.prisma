@@ -96,3 +96,9 @@ model InvoiceLine {
   unitPrice   Float
   sortOrder   Int     @default(0)
 }
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

@@ -123,6 +123,16 @@ export async function register() {
     // Marketing consent opt-in (added for app-launch funnel)
     await prisma.$executeRaw`ALTER TABLE "Drop" ADD COLUMN IF NOT EXISTS "marketingConsent" BOOLEAN NOT NULL DEFAULT false`;
 
+    // App settings (key-value store)
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "Setting" (
+        "key"       TEXT NOT NULL,
+        "value"     TEXT NOT NULL,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "Setting_pkey" PRIMARY KEY ("key")
+      )
+    `;
+
     console.log('[migration] schema up to date');
   } catch (err) {
     console.error('[migration] failed:', err);

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { redirect, notFound } from 'next/navigation';
 import PrintButton from './PrintButton';
+import { getCompanySettings } from '@/lib/settings';
 
 function fmt(n: number) {
   return new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(n);
@@ -23,24 +24,26 @@ export default async function PrintInvoicePage({ params }: { params: Promise<{ i
   const vat      = subtotal * invoice.vatPct / 100;
   const total    = subtotal + vat;
 
-  // ── Company details from env vars ────────────────────────────────────────────
+  // ── Company details from DB (with env var fallback) ──────────────────────────
+  const raw = await getCompanySettings();
   const co = {
-    name:    process.env.COMPANY_NAME     ?? 'FestiDrop',
-    address: process.env.COMPANY_ADDRESS  ?? null,
-    city:    process.env.COMPANY_CITY     ?? null,
-    kvk:     process.env.COMPANY_KVK     ?? null,
-    btw:     process.env.COMPANY_BTW     ?? null,
-    iban:    process.env.COMPANY_IBAN    ?? null,
-    bank:    process.env.COMPANY_BANK    ?? null,
-    email:   process.env.COMPANY_EMAIL   ?? 'info@festidrop.nl',
-    website: process.env.COMPANY_WEBSITE ?? 'www.festidrop.nl',
+    name:    raw.name    || null,
+    address: raw.address || null,
+    city:    raw.city    || null,
+    kvk:     raw.kvk     || null,
+    btw:     raw.btw     || null,
+    iban:    raw.iban    || null,
+    bank:    raw.bank    || null,
+    email:   raw.email   || 'info@festidrop.nl',
+    website: raw.website || 'www.festidrop.nl',
   };
 
   const missingFields = [
-    !co.address && 'COMPANY_ADDRESS',
-    !co.kvk     && 'COMPANY_KVK',
-    !co.btw     && 'COMPANY_BTW',
-    !co.iban    && 'COMPANY_IBAN',
+    !co.name    && 'Bedrijfsnaam',
+    !co.address && 'Adres',
+    !co.kvk     && 'KVK',
+    !co.btw     && 'BTW',
+    !co.iban    && 'IBAN',
   ].filter(Boolean) as string[];
 
   return (
@@ -63,9 +66,9 @@ export default async function PrintInvoicePage({ params }: { params: Promise<{ i
         </span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {missingFields.length > 0 && (
-            <span style={{ fontSize: 11, color: '#FFB800', fontWeight: 600, background: 'rgba(255,184,0,0.12)', border: '1px solid rgba(255,184,0,0.2)', borderRadius: 8, padding: '4px 10px' }}>
-              ⚠ Vercel env vars ontbreken: {missingFields.join(', ')}
-            </span>
+            <a href="/admin/settings" style={{ fontSize: 11, color: '#FFB800', fontWeight: 600, background: 'rgba(255,184,0,0.12)', border: '1px solid rgba(255,184,0,0.2)', borderRadius: 8, padding: '4px 10px', textDecoration: 'none' }}>
+              ⚠ Ontbrekend: {missingFields.join(', ')} → Instellingen
+            </a>
           )}
           <a href="/admin/invoices" style={{ color: 'rgba(189,239,255,0.5)', fontSize: 12, fontWeight: 600, textDecoration: 'none', padding: '8px 16px', borderRadius: 8, background: 'rgba(255,255,255,0.06)' }}>
             ← Terug

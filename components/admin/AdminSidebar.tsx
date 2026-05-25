@@ -51,6 +51,15 @@ const nav = [
       </svg>
     ),
   },
+  {
+    href: '/admin/settings', label: 'Instellingen',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+        <circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M8 1.5v1.3M8 13.2v1.3M1.5 8h1.3M13.2 8h1.3M3.5 3.5l.92.92M11.58 11.58l.92.92M11.58 4.42l-.92.92M4.42 11.58l-.92.92" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
 ];
 
 const EXPANDED = 240;
