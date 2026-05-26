@@ -129,32 +129,50 @@ export default async function AdminDashboard() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-start justify-between mb-8">
         <div>
           <h1 className="text-2xl font-black text-navy" style={{ letterSpacing: '-0.03em' }}>Dashboard</h1>
-          <p className="text-sm text-muted mt-0.5">Overzicht van al jouw FestiDrop events</p>
+          <p className="text-sm text-muted mt-0.5">
+            {totalEvents > 0
+              ? `${totalEvents} event${totalEvents !== 1 ? 's' : ''} · ${totalDrops} drops totaal`
+              : 'Overzicht van al jouw FestiDrop events'}
+          </p>
         </div>
-        <Link
-          href="/admin/events/new"
-          className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
-          style={{ background: 'linear-gradient(135deg, #1E8BFF, #20D6E8)', boxShadow: '0 8px 24px rgba(30,139,255,0.25)' }}
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M7 1v12M1 7h12" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-          Nieuw event
-        </Link>
+        <div className="flex items-center gap-2 shrink-0">
+          <div
+            className="hidden sm:flex items-center gap-2 rounded-xl px-3 py-2"
+            style={{ background: 'rgba(30,139,255,0.06)', border: '1px solid rgba(30,139,255,0.15)' }}
+          >
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <rect x="1" y="2.5" width="11" height="9.5" rx="1.5" stroke="#1E8BFF" strokeWidth="1.1"/>
+              <path d="M1 5.5h11M4 1.5v2M9 1.5v2" stroke="#1E8BFF" strokeWidth="1.1" strokeLinecap="round"/>
+            </svg>
+            <span className="text-xs font-black" style={{ color: '#1E8BFF' }}>
+              {now.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}
+            </span>
+          </div>
+          <Link
+            href="/admin/events/new"
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
+            style={{ background: 'linear-gradient(135deg, #1E8BFF, #20D6E8)', boxShadow: '0 8px 24px rgba(30,139,255,0.25)' }}
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M7 1v12M1 7h12" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+            Nieuw event
+          </Link>
+        </div>
       </div>
 
       {/* ── Stat cards ──────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard label="Totaal events" value={totalEvents} color="#1E8BFF" trend={eventsTrend}
+        <StatCard label="Totaal events" value={totalEvents} color="#1E8BFF" grad="linear-gradient(135deg,#1E8BFF,#20D6E8)" trend={eventsTrend}
           icon={
             <path d="M3 6a3 3 0 116 0 3 3 0 01-6 0zM14.25 6a3 3 0 11-6 0 3 3 0 016 0zM4.5 15a3 3 0 116 0 3 3 0 01-6 0zM15.75 15a3 3 0 11-6 0 3 3 0 016 0z"
               fill="currentColor" />
           }
         />
-        <StatCard label="Vandaag" value={dropsToday} color="#00C896" trend={todayTrend}
+        <StatCard label="Vandaag" value={dropsToday} color="#00C896" grad="linear-gradient(135deg,#00C896,#00A878)" trend={todayTrend}
           icon={
             <>
               <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.5" fill="none"/>
@@ -162,7 +180,7 @@ export default async function AdminDashboard() {
             </>
           }
         />
-        <StatCard label="Afgelopen 7 dagen" value={dropsThisWeek} color="#7B2FF7" trend={weekTrend}
+        <StatCard label="Afgelopen 7 dagen" value={dropsThisWeek} color="#7B2FF7" grad="linear-gradient(135deg,#7B2FF7,#1E8BFF)" trend={weekTrend}
           icon={
             <>
               <rect x="2" y="4" width="16" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" fill="none"/>
@@ -170,7 +188,7 @@ export default async function AdminDashboard() {
             </>
           }
         />
-        <StatCard label="Totaal drops" value={totalDrops} color="#20D6E8" trend={totalTrend}
+        <StatCard label="Totaal drops" value={totalDrops} color="#20D6E8" grad="linear-gradient(135deg,#1E8BFF,#20D6E8)" trend={totalTrend}
           icon={
             <>
               <rect x="3" y="7" width="14" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" fill="none"/>
@@ -183,14 +201,30 @@ export default async function AdminDashboard() {
 
       {/* ── 7-day chart ─────────────────────────────────────────────────────── */}
       <div
-        className="rounded-2xl p-5 mb-6"
-        style={{ background: 'rgba(255,255,255,0.85)', border: '1px solid rgba(189,239,255,0.55)', boxShadow: '0 2px 12px rgba(7,22,47,0.04)' }}
+        className="rounded-2xl overflow-hidden mb-6"
+        style={{ background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(189,239,255,0.55)', boxShadow: '0 4px 16px rgba(7,22,47,0.05)' }}
       >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xs font-black uppercase tracking-[0.1em] text-muted">Drops afgelopen 7 dagen</h2>
-          <span className="text-xs font-bold text-navy">{last7DaysDrops.length} totaal</span>
+        <div className="h-1" style={{ background: 'linear-gradient(90deg, #1E8BFF, #20D6E8, #7B2FF7)' }} />
+        <div className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
+                style={{ background: 'rgba(30,139,255,0.1)' }}>
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                  <path d="M1 9h9M2.5 9V6M5 9V3.5M7.5 9V5.5" stroke="#1E8BFF" strokeWidth="1.2" strokeLinecap="round"/>
+                </svg>
+              </div>
+              <h2 className="text-[10px] font-black uppercase tracking-[0.12em] text-muted">Drops afgelopen 7 dagen</h2>
+            </div>
+            <span
+              className="text-[10px] font-black px-2 py-0.5 rounded-full"
+              style={{ background: 'rgba(30,139,255,0.08)', color: '#1E8BFF' }}
+            >
+              {last7DaysDrops.length} totaal
+            </span>
+          </div>
+          <DashboardChart data={chartData} />
         </div>
-        <DashboardChart data={chartData} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
@@ -198,7 +232,23 @@ export default async function AdminDashboard() {
         {/* ── Active events ──────────────────────────────────────────────────── */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xs font-black uppercase tracking-[0.1em] text-muted">Actieve events</h2>
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
+                style={{ background: 'rgba(0,200,150,0.1)' }}>
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                  <rect x="0.75" y="2.5" width="9.5" height="8" rx="1.5" stroke="#00C896" strokeWidth="1.1"/>
+                  <circle cx="5.5" cy="6.5" r="2" stroke="#00C896" strokeWidth="1.1"/>
+                  <path d="M3.5 2.5V2A2 2 0 015.5.5v0A2 2 0 017.5 2v.5" stroke="#00C896" strokeWidth="1.1" strokeLinecap="round"/>
+                </svg>
+              </div>
+              <h2 className="text-[10px] font-black uppercase tracking-[0.12em] text-muted">Actieve events</h2>
+              {activeEvents.length > 0 && (
+                <span className="text-[10px] font-black px-2 py-0.5 rounded-full"
+                  style={{ background: 'rgba(0,200,150,0.1)', color: '#00A878' }}>
+                  {activeEvents.length}
+                </span>
+              )}
+            </div>
             <Link href="/admin/events" className="text-xs font-bold text-azure hover:underline">Alle events →</Link>
           </div>
 
@@ -233,31 +283,32 @@ export default async function AdminDashboard() {
                 return (
                   <div
                     key={event.id}
-                    className="flex items-center gap-4 rounded-2xl px-5 py-4"
+                    className="flex items-center gap-4 rounded-2xl px-5 py-4 transition-all hover:scale-[1.003]"
                     style={{
-                      background:  'rgba(255,255,255,0.85)',
-                      border:      '1px solid rgba(189,239,255,0.55)',
-                      boxShadow:   '0 2px 12px rgba(7,22,47,0.04)',
+                      background: `linear-gradient(135deg, ${event.accentColor}08 0%, rgba(255,255,255,0.95) 55%)`,
+                      border:     `1px solid ${event.accentColor}25`,
+                      boxShadow:  `inset 4px 0 0 ${event.accentColor}, 0 2px 12px rgba(7,22,47,0.04)`,
                     }}
                   >
-                    {/* Dot — pulsing when live */}
-                    <div className="relative shrink-0">
-                      <div
-                        className="w-3.5 h-3.5 rounded-full"
-                        style={{ background: event.accentColor }}
-                      />
-                      {isLive && (
-                        <div
-                          className="absolute inset-0 rounded-full animate-ping"
-                          style={{ background: event.accentColor, opacity: 0.5 }}
-                        />
-                      )}
+                    {/* Color icon */}
+                    <div
+                      className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                      style={{
+                        background: `linear-gradient(135deg, ${event.accentColor}, ${event.accentColor}BB)`,
+                        boxShadow:  `0 4px 12px ${event.accentColor}35`,
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
+                        <rect x="1" y="5" width="16" height="11" rx="2.5" stroke="white" strokeWidth="1.5"/>
+                        <circle cx="9" cy="10.5" r="3" stroke="white" strokeWidth="1.5"/>
+                        <path d="M6 5V3.5A1.5 1.5 0 017.5 2h3A1.5 1.5 0 0112 3.5V5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                      </svg>
                     </div>
 
                     {/* Name + URL + last drop */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-bold text-navy truncate">{event.name}</p>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="text-sm font-black text-navy truncate">{event.name}</p>
                         {isLive && (
                           <span
                             className="text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0"
@@ -323,14 +374,24 @@ export default async function AdminDashboard() {
         {/* ── Recent drops ───────────────────────────────────────────────────── */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xs font-black uppercase tracking-[0.1em] text-muted">Recente drops</h2>
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
+                style={{ background: 'rgba(123,47,247,0.1)' }}>
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                  <circle cx="5.5" cy="5.5" r="4" stroke="#7B2FF7" strokeWidth="1.1"/>
+                  <path d="M5.5 3.5v2l1.5 1" stroke="#7B2FF7" strokeWidth="1.1" strokeLinecap="round"/>
+                </svg>
+              </div>
+              <h2 className="text-[10px] font-black uppercase tracking-[0.12em] text-muted">Recente drops</h2>
+            </div>
             <Link href="/admin/events" className="text-xs font-bold text-azure hover:underline">Alle events →</Link>
           </div>
 
           <div
             className="rounded-2xl overflow-hidden"
-            style={{ background: 'rgba(255,255,255,0.85)', border: '1px solid rgba(189,239,255,0.55)' }}
+            style={{ background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(189,239,255,0.55)', boxShadow: '0 4px 16px rgba(7,22,47,0.05)' }}
           >
+            <div className="h-1" style={{ background: 'linear-gradient(90deg, #7B2FF7, #1E8BFF)' }} />
             {recentDrops.length === 0 ? (
               <div className="px-5 py-8 text-center">
                 <p className="text-xs text-muted">Nog geen drops</p>
@@ -378,11 +439,12 @@ export default async function AdminDashboard() {
 
 // ── StatCard ───────────────────────────────────────────────────────────────────
 function StatCard({
-  label, value, color, icon, trend,
+  label, value, color, grad, icon, trend,
 }: {
   label:  string;
   value:  number;
   color:  string;
+  grad:   string;
   icon:   React.ReactNode;
   trend?: { pct: number; label: string } | null;
 }) {
@@ -400,31 +462,34 @@ function StatCard({
 
   return (
     <div
-      className="rounded-2xl p-5"
+      className="rounded-2xl overflow-hidden"
       style={{
-        background: 'rgba(255,255,255,0.85)',
+        background: 'rgba(255,255,255,0.9)',
         border:     '1px solid rgba(189,239,255,0.55)',
         boxShadow:  '0 2px 12px rgba(7,22,47,0.04)',
       }}
     >
-      <div
-        className="w-8 h-8 rounded-xl flex items-center justify-center mb-3"
-        style={{ background: `${color}18`, color }}
-      >
-        <svg width="18" height="18" viewBox="0 0 20 20" fill="none">{icon}</svg>
-      </div>
-
-      <p className="text-3xl font-black" style={{ color, letterSpacing: '-0.04em' }}>{value}</p>
-      <p className="text-xs text-muted mt-0.5">{label}</p>
-
-      {trend != null && (
-        <div className="flex items-center gap-1 mt-2">
-          <span className="text-[10px] font-black" style={{ color: trendColor }}>
-            {trendArrow} {Math.abs(trend.pct)}%
-          </span>
-          <span className="text-[10px] text-muted">{trend.label}</span>
+      <div className="h-1" style={{ background: grad }} />
+      <div className="p-5">
+        <div
+          className="w-8 h-8 rounded-xl flex items-center justify-center mb-3"
+          style={{ background: `${color}15`, color }}
+        >
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="none">{icon}</svg>
         </div>
-      )}
+
+        <p className="text-3xl font-black" style={{ color, letterSpacing: '-0.04em' }}>{value}</p>
+        <p className="text-xs text-muted mt-0.5">{label}</p>
+
+        {trend != null && (
+          <div className="flex items-center gap-1 mt-2">
+            <span className="text-[10px] font-black" style={{ color: trendColor }}>
+              {trendArrow} {Math.abs(trend.pct)}%
+            </span>
+            <span className="text-[10px] text-muted">{trend.label}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
