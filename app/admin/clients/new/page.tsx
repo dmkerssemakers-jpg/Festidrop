@@ -1,6 +1,18 @@
 import { createClient } from '@/lib/actions';
 import Link from 'next/link';
 
+const fieldStyle: React.CSSProperties = {
+  width:        '100%',
+  borderRadius: 10,
+  padding:      '9px 12px',
+  fontSize:     13,
+  fontFamily:   'inherit',
+  background:   'rgba(247,251,255,0.9)',
+  border:       '1.5px solid rgba(189,239,255,0.65)',
+  color:        '#07162F',
+  outline:      'none',
+};
+
 export default function NewClientPage() {
   return (
     <div style={{ maxWidth: 560 }}>
@@ -59,7 +71,7 @@ export default function NewClientPage() {
                 required
                 placeholder="bijv. Mojo Concerts"
                 autoFocus
-                className="client-field"
+                style={fieldStyle}
               />
             </Field>
           </div>
@@ -82,20 +94,20 @@ export default function NewClientPage() {
 
             <div className="space-y-3">
               <Field label="Contactpersoon">
-                <input name="contactPerson" placeholder="bijv. Jan de Vries" className="client-field" />
+                <input name="contactPerson" placeholder="bijv. Jan de Vries" style={fieldStyle} />
               </Field>
 
               <div className="grid grid-cols-2 gap-3">
                 <Field label="E-mail">
-                  <input name="email" type="email" placeholder="jan@bedrijf.nl" className="client-field" />
+                  <input name="email" type="email" placeholder="jan@bedrijf.nl" style={fieldStyle} />
                 </Field>
                 <Field label="Telefoon">
-                  <input name="phone" placeholder="+31 6 12345678" className="client-field" />
+                  <input name="phone" placeholder="+31 6 12345678" style={fieldStyle} />
                 </Field>
               </div>
 
               <Field label="Website">
-                <input name="website" type="url" placeholder="https://bedrijf.nl" className="client-field" />
+                <input name="website" type="url" placeholder="https://bedrijf.nl" style={fieldStyle} />
               </Field>
             </div>
           </div>
@@ -122,8 +134,7 @@ export default function NewClientPage() {
                 name="notes"
                 placeholder="bijv. vaste klant, jaarcontract, factuuradres…"
                 rows={3}
-                className="client-field"
-                style={{ resize: 'none' }}
+                style={{ ...fieldStyle, resize: 'none' }}
               />
             </Field>
           </div>
@@ -151,27 +162,6 @@ export default function NewClientPage() {
 
       </form>
 
-      <style jsx>{`
-        .client-field {
-          width: 100%;
-          border-radius: 10px;
-          padding: 9px 12px;
-          font-size: 13px;
-          font-family: inherit;
-          background: rgba(247,251,255,0.9);
-          border: 1.5px solid rgba(189,239,255,0.65);
-          color: #07162F;
-          outline: none;
-          transition: border-color 0.15s, box-shadow 0.15s;
-        }
-        .client-field:focus {
-          border-color: #1E8BFF;
-          box-shadow: 0 0 0 3px rgba(30,139,255,0.08);
-        }
-        .client-field::placeholder {
-          color: rgba(108,122,141,0.45);
-        }
-      `}</style>
     </div>
   );
 }
