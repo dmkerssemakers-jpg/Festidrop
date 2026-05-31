@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import Confetti from './Confetti';
 
 type Props = {
   photos:        string[];
@@ -481,6 +482,9 @@ export default function EmailDropCard({
             transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
             className="p-7 text-center"
           >
+            {/* Celebration burst */}
+            <Confetti accentColor={accentColor} />
+
             {/* Success checkmark */}
             <motion.div
               className="w-20 h-20 rounded-full mx-auto mb-5 flex items-center justify-center relative"

@@ -51,94 +51,51 @@ export default function NewClientPage() {
       <form action={createClient} className="space-y-4">
 
         {/* ── Identiteit ─────────────────────────────────────────────────────── */}
-        <div
-          className="rounded-2xl overflow-hidden"
-          style={{ background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(189,239,255,0.55)', boxShadow: '0 4px 16px rgba(7,22,47,0.05)' }}
-        >
-          <div className="h-1" style={{ background: 'linear-gradient(90deg, #1E8BFF, #20D6E8)' }} />
-          <div className="p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black text-white shrink-0"
-                style={{ background: '#1E8BFF' }}>
-                1
-              </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted">Bedrijfsidentiteit</p>
-            </div>
-
-            <Field label="Bedrijfsnaam" required>
-              <input
-                name="name"
-                required
-                placeholder="bijv. Mojo Concerts"
-                autoFocus
-                style={fieldStyle}
-              />
-            </Field>
-          </div>
-        </div>
+        <SectionCard step={1} color="#1E8BFF" grad="linear-gradient(90deg, #1E8BFF, #20D6E8)" label="Bedrijfsidentiteit">
+          <Field label="Bedrijfsnaam" required>
+            <input
+              name="name"
+              required
+              placeholder="bijv. Mojo Concerts"
+              autoFocus
+              style={fieldStyle}
+            />
+          </Field>
+        </SectionCard>
 
         {/* ── Contact ─────────────────────────────────────────────────────────── */}
-        <div
-          className="rounded-2xl overflow-hidden"
-          style={{ background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(189,239,255,0.55)', boxShadow: '0 4px 16px rgba(7,22,47,0.05)' }}
-        >
-          <div className="h-1" style={{ background: 'linear-gradient(90deg, #7B2FF7, #1E8BFF)' }} />
-          <div className="p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black text-white shrink-0"
-                style={{ background: '#7B2FF7' }}>
-                2
-              </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted">Contactgegevens</p>
-            </div>
+        <SectionCard step={2} color="#7B2FF7" grad="linear-gradient(90deg, #7B2FF7, #1E8BFF)" label="Contactgegevens">
+          <div className="space-y-3">
+            <Field label="Contactpersoon">
+              <input name="contactPerson" placeholder="bijv. Jan de Vries" style={fieldStyle} />
+            </Field>
 
-            <div className="space-y-3">
-              <Field label="Contactpersoon">
-                <input name="contactPerson" placeholder="bijv. Jan de Vries" style={fieldStyle} />
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="E-mail">
+                <input name="email" type="email" placeholder="jan@bedrijf.nl" style={fieldStyle} />
               </Field>
-
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="E-mail">
-                  <input name="email" type="email" placeholder="jan@bedrijf.nl" style={fieldStyle} />
-                </Field>
-                <Field label="Telefoon">
-                  <input name="phone" placeholder="+31 6 12345678" style={fieldStyle} />
-                </Field>
-              </div>
-
-              <Field label="Website">
-                <input name="website" type="url" placeholder="https://bedrijf.nl" style={fieldStyle} />
+              <Field label="Telefoon">
+                <input name="phone" placeholder="+31 6 12345678" style={fieldStyle} />
               </Field>
             </div>
-          </div>
-        </div>
 
-        {/* ── Intern ──────────────────────────────────────────────────────────── */}
-        <div
-          className="rounded-2xl overflow-hidden"
-          style={{ background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(189,239,255,0.55)', boxShadow: '0 4px 16px rgba(7,22,47,0.05)' }}
-        >
-          <div className="h-1" style={{ background: 'linear-gradient(90deg, #00C896, #1E8BFF)' }} />
-          <div className="p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black text-white shrink-0"
-                style={{ background: '#00A878' }}>
-                3
-              </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted">Intern</p>
-              <span className="text-[10px] text-muted">(alleen voor jou zichtbaar)</span>
-            </div>
-
-            <Field label="Notities">
-              <textarea
-                name="notes"
-                placeholder="bijv. vaste klant, jaarcontract, factuuradres…"
-                rows={3}
-                style={{ ...fieldStyle, resize: 'none' }}
-              />
+            <Field label="Website">
+              <input name="website" type="url" placeholder="https://bedrijf.nl" style={fieldStyle} />
             </Field>
           </div>
-        </div>
+        </SectionCard>
+
+        {/* ── Intern ──────────────────────────────────────────────────────────── */}
+        <SectionCard step={3} color="#00A878" grad="linear-gradient(90deg, #00C896, #1E8BFF)" label="Intern" note="(alleen voor jou zichtbaar)">
+          <Field label="Notities">
+            <textarea
+              name="notes"
+              placeholder="bijv. vaste klant, jaarcontract, factuuradres…"
+              rows={3}
+              style={{ ...fieldStyle, resize: 'none' }}
+            />
+          </Field>
+        </SectionCard>
 
         {/* Submit */}
         <button
@@ -162,6 +119,42 @@ export default function NewClientPage() {
 
       </form>
 
+    </div>
+  );
+}
+
+function SectionCard({
+  step,
+  color,
+  grad,
+  label,
+  note,
+  children,
+}: {
+  step: number;
+  color: string;
+  grad: string;
+  label: string;
+  note?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="rounded-2xl overflow-hidden"
+      style={{ background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(189,239,255,0.55)', boxShadow: '0 4px 16px rgba(7,22,47,0.05)' }}
+    >
+      <div className="h-1" style={{ background: grad }} />
+      <div className="p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black text-white shrink-0"
+            style={{ background: color }}>
+            {step}
+          </div>
+          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted">{label}</p>
+          {note && <span className="text-[10px] text-muted">{note}</span>}
+        </div>
+        {children}
+      </div>
     </div>
   );
 }

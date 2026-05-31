@@ -28,6 +28,7 @@ export async function generateMetadata(
   const desc    = 'Maak gratis polaroid-foto\'s en ontvang ze direct per e-mail. 📸';
 
   return {
+    metadataBase: new URL(baseUrl),
     title,
     description: desc,
     openGraph: {
@@ -38,7 +39,7 @@ export async function generateMetadata(
       type:        'website',
     },
     twitter: {
-      card:        'summary',
+      card:        'summary_large_image',
       title,
       description: desc,
     },

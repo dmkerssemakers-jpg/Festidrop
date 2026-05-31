@@ -748,8 +748,11 @@ export default function CameraCapture({
             style={{ scrollbarWidth: 'none' }}
           >
             {thumbnails.map((src, i) => (
-              <div
+              <motion.div
                 key={i}
+                initial={{ opacity: 0, scale: 0.55, y: -10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ type: 'spring', stiffness: 420, damping: 22 }}
                 className="shrink-0 rounded-lg overflow-hidden"
                 style={{
                   width:     44,
@@ -760,12 +763,15 @@ export default function CameraCapture({
                 }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <motion.img
                   src={src}
                   alt={`Foto ${i + 1}`}
+                  initial={{ filter: 'brightness(0.18) saturate(0.25) contrast(1.5)' }}
+                  animate={{ filter: 'brightness(1) saturate(1) contrast(1)' }}
+                  transition={{ duration: 1.7, ease: 'easeOut' }}
                   style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 3, display: 'block' }}
                 />
-              </div>
+              </motion.div>
             ))}
           </div>
         )}

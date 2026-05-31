@@ -25,24 +25,27 @@ const SECTIONS = [
     grad:  'linear-gradient(90deg,#7B2FF7,#1E8BFF)',
     label: 'Fiscale gegevens',
     fields: [
-      { key: 'kvk',  label: 'KVK-nummer',  placeholder: '12345678',           required: false, full: false },
-      { key: 'btw',  label: 'BTW-nummer',  placeholder: 'NL123456789B01',     required: false, full: false },
-      { key: 'iban', label: 'IBAN',        placeholder: 'NL00INGB0000000000', required: false, full: true  },
+      { key: 'kvk',  label: 'KVK-nummer',  placeholder: '12345678',           required: true,  full: false },
+      { key: 'btw',  label: 'BTW-nummer',  placeholder: 'NL123456789B01',     required: true,  full: false },
+      { key: 'iban', label: 'IBAN',        placeholder: 'NL00INGB0000000000', required: true,  full: true  },
       { key: 'bank', label: 'Banknaam',    placeholder: 'ING',                required: false, full: false },
     ],
   },
 ] as const;
 
 type FieldKey = keyof CompanySettings;
+type FieldConfig = { key: FieldKey; label: string; placeholder: string; required: boolean; full: boolean };
 
-const REQUIRED: FieldKey[] = ['name', 'kvk', 'btw', 'iban'];
-
-const REQUIRED_LABELS: Record<string, string> = {
-  name: 'Bedrijfsnaam',
-  kvk:  'KVK-nummer',
-  btw:  'BTW-nummer',
-  iban: 'IBAN',
-};
+// Single source of truth: the fields flagged `required` in SECTIONS drive the
+// inline "verplicht" badge, the completeness bar and the checklist alike — so
+// they can never disagree about which fields are required.
+const REQUIRED_FIELDS: FieldConfig[] = SECTIONS
+  .flatMap(s => s.fields as readonly FieldConfig[])
+  .filter(f => f.required);
+const REQUIRED = REQUIRED_FIELDS.map(f => f.key);
+const REQUIRED_LABELS: Record<string, string> = Object.fromEntries(
+  REQUIRED_FIELDS.map(f => [f.key, f.label]),
+);
 
 export default function SettingsForm({ initial }: { initial: CompanySettings }) {
   const [isPending, startTransition] = useTransition();
@@ -329,7 +332,7 @@ export default function SettingsForm({ initial }: { initial: CompanySettings }) 
                       </div>
                       <span
                         className="text-xs font-semibold"
-                        style={{ color: done ? '#07162F' : '#9CA3AF', textDecoration: done ? 'none' : 'none' }}
+                        style={{ color: done ? '#07162F' : '#9CA3AF' }}
                       >
                         {REQUIRED_LABELS[k]}
                       </span>

@@ -3,6 +3,8 @@ import type { Event, Drop } from '@prisma/client';
 import Link from 'next/link';
 import CopyLinkButton from '@/components/admin/CopyLinkButton';
 import DashboardChart from '@/components/admin/DashboardChart';
+import CountUp from '@/components/admin/CountUp';
+import Sparkline from '@/components/admin/Sparkline';
 
 // ISR: rebuild every 60 seconds so stats stay fresh without hitting DB on every request
 export const revalidate = 60;
@@ -115,6 +117,8 @@ export default async function AdminDashboard() {
       d => new Date(d.sentAt).toISOString().slice(0, 10) === day,
     ).length,
   }));
+  // Numeric 7-day series reused for the stat-card sparklines
+  const dropSeries = chartData.map(d => d.count);
 
   // ── Trends ────────────────────────────────────────────────────────────────
   const todayTrend  = calcTrend(dropsToday,       dropsYesterday,    'vs gisteren');
@@ -172,7 +176,7 @@ export default async function AdminDashboard() {
               fill="currentColor" />
           }
         />
-        <StatCard label="Vandaag" value={dropsToday} color="#00C896" grad="linear-gradient(135deg,#00C896,#00A878)" trend={todayTrend}
+        <StatCard label="Vandaag" value={dropsToday} color="#00C896" grad="linear-gradient(135deg,#00C896,#00A878)" trend={todayTrend} series={dropSeries}
           icon={
             <>
               <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.5" fill="none"/>
@@ -180,7 +184,7 @@ export default async function AdminDashboard() {
             </>
           }
         />
-        <StatCard label="Afgelopen 7 dagen" value={dropsThisWeek} color="#7B2FF7" grad="linear-gradient(135deg,#7B2FF7,#1E8BFF)" trend={weekTrend}
+        <StatCard label="Afgelopen 7 dagen" value={dropsThisWeek} color="#7B2FF7" grad="linear-gradient(135deg,#7B2FF7,#1E8BFF)" trend={weekTrend} series={dropSeries}
           icon={
             <>
               <rect x="2" y="4" width="16" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" fill="none"/>
@@ -188,7 +192,7 @@ export default async function AdminDashboard() {
             </>
           }
         />
-        <StatCard label="Totaal drops" value={totalDrops} color="#20D6E8" grad="linear-gradient(135deg,#1E8BFF,#20D6E8)" trend={totalTrend}
+        <StatCard label="Totaal drops" value={totalDrops} color="#20D6E8" grad="linear-gradient(135deg,#20D6E8,#1E8BFF)" trend={totalTrend} series={dropSeries}
           icon={
             <>
               <rect x="3" y="7" width="14" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" fill="none"/>
@@ -439,14 +443,15 @@ export default async function AdminDashboard() {
 
 // ── StatCard ───────────────────────────────────────────────────────────────────
 function StatCard({
-  label, value, color, grad, icon, trend,
+  label, value, color, grad, icon, trend, series,
 }: {
-  label:  string;
-  value:  number;
-  color:  string;
-  grad:   string;
-  icon:   React.ReactNode;
-  trend?: { pct: number; label: string } | null;
+  label:   string;
+  value:   number;
+  color:   string;
+  grad:    string;
+  icon:    React.ReactNode;
+  trend?:  { pct: number; label: string } | null;
+  series?: number[];
 }) {
   const trendColor =
     !trend           ? '#8A94A6' :
@@ -478,7 +483,9 @@ function StatCard({
           <svg width="18" height="18" viewBox="0 0 20 20" fill="none">{icon}</svg>
         </div>
 
-        <p className="text-3xl font-black" style={{ color, letterSpacing: '-0.04em' }}>{value}</p>
+        <p className="text-3xl font-black" style={{ color, letterSpacing: '-0.04em' }}>
+          <CountUp value={value} />
+        </p>
         <p className="text-xs text-muted mt-0.5">{label}</p>
 
         {trend != null && (
@@ -487,6 +494,12 @@ function StatCard({
               {trendArrow} {Math.abs(trend.pct)}%
             </span>
             <span className="text-[10px] text-muted">{trend.label}</span>
+          </div>
+        )}
+
+        {series && series.length > 1 && (
+          <div className="mt-3 -mb-1" aria-hidden>
+            <Sparkline series={series} color={color} height={28} />
           </div>
         )}
       </div>
